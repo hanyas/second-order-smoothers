@@ -2,31 +2,27 @@ from typing import Callable, Optional, Union
 
 import jax
 import jax.numpy as jnp
-from jax.scipy.linalg import cho_solve, solve_triangular
+from jax import jacfwd, jacrev
+from jax.scipy.linalg import cho_solve
 
-from parsmooth._base import MVNStandard, FunctionalModel, MVNSqrt, are_inputs_compatible, ConditionalMomentsModel
-from parsmooth._utils import tria, none_or_shift, none_or_concat, mvn_loglikelihood
+from parsmooth._base import MVNStandard, FunctionalModel, are_inputs_compatible, ConditionalMomentsModel
+from parsmooth._utils import none_or_shift, none_or_concat, mvn_loglikelihood
 
 
 def filtering(observations: jnp.ndarray,
-              x0: Union[MVNSqrt, MVNStandard],
+              x0: MVNStandard,
               transition_model: Union[FunctionalModel, ConditionalMomentsModel],
               observation_model: Union[FunctionalModel, ConditionalMomentsModel],
               linearization_method: Callable,
-              nominal_trajectory: Optional[Union[MVNSqrt, MVNStandard]] = None,
-              return_loglikelihood: bool = False):
+              nominal_trajectory: Optional[MVNStandard] = None):
     if nominal_trajectory is not None:
         are_inputs_compatible(x0, nominal_trajectory)
 
     def predict(F_x, cov_or_chol, b, x):
-        if isinstance(x, MVNSqrt):
-            return _sqrt_predict(F_x, cov_or_chol, b, x)
-        return _standard_predict(F_x, cov_or_chol, b, x)
+        return _predict(F_x, cov_or_chol, b, x)
 
     def update(H_x, cov_or_chol, c, x, y):
-        if isinstance(x, MVNSqrt):
-            return _sqrt_update(H_x, cov_or_chol, c, x, y)
-        return _standard_update(H_x, cov_or_chol, c, x, y)
+        return _update(H_x, cov_or_chol, c, x, y)
 
     def body(carry, inp):
         x, ell = carry
@@ -34,12 +30,14 @@ def filtering(observations: jnp.ndarray,
 
         if predict_ref is None:
             predict_ref = x
-        F_x, cov_or_chol_Q, b = linearization_method(transition_model, predict_ref)
-        x = predict(F_x, cov_or_chol_Q, b, x)
+        F_x, Q, b = linearization_method(transition_model, predict_ref)
+        x = predict(F_x, Q, b, x)
         if update_ref is None:
             update_ref = x
-        H_x, cov_or_chol_R, c = linearization_method(observation_model, update_ref)
-        x, ell_inc = update(H_x, cov_or_chol_R, c, x, y)
+        H_x, R, c = linearization_method(observation_model, update_ref, )
+
+        x, ell_inc = update(H_x, R, c, x, y)
+        H_xx, F_xx = _pseudo_update(transition_model, observation_model, predict_ref, update_ref, Q, R)
         return (x, ell + ell_inc), x
 
     predict_traj = none_or_shift(nominal_trajectory, -1)
@@ -47,13 +45,11 @@ def filtering(observations: jnp.ndarray,
 
     (_, ell), xs = jax.lax.scan(body, (x0, 0.), (observations, predict_traj, update_traj))
     xs = none_or_concat(xs, x0, 1)
-    if return_loglikelihood:
-        return xs, ell
-    else:
-        return xs
+
+    return xs
 
 
-def _standard_predict(F, Q, b, x):
+def _predict(F, Q, b, x):
     m, P = x
 
     m = F @ m + b
@@ -62,7 +58,7 @@ def _standard_predict(F, Q, b, x):
     return MVNStandard(m, P)
 
 
-def _standard_update(H, R, c, x, y):
+def _update(H, R, c, x, y):
     m, P = x
 
     y_hat = H @ m + c
@@ -77,32 +73,24 @@ def _standard_update(H, R, c, x, y):
     return MVNStandard(m, P), ell
 
 
-def _sqrt_predict(F, cholQ, b, x):
-    m, cholP = x
-
-    m = F @ m + b
-    cholP = tria(jnp.concatenate([F @ cholP, cholQ], axis=1))
-
-    return MVNSqrt(m, cholP)
+def hessian(f):
+    return jacfwd(jacrev(f))
 
 
-def _sqrt_update(H, cholR, c, x, y):
-    m, cholP = x
-    nx = m.shape[0]
-    ny = y.shape[0]
+vectens = lambda a, b: jnp.sum(a * b[:,None,None], 0)
 
-    y_hat = H @ m + c
-    y_diff = y - y_hat
 
-    M = jnp.block([[H @ cholP, cholR],
-                   [cholP, jnp.zeros_like(cholP, shape=(nx, ny))]])
-    chol_S = tria(M)
+def _pseudo_update(transition_model, observation_model, x_predict, x_update, Q, R, y, P):
+    x_k_1, P_p = x_predict
+    x_k, P_u = x_update
+    F_xx = hessian(transition_model)(x_k_1)
+    H_xx = hessian(observation_model)(x_k)
+    Lambda = vectens(-F_xx, Q @ (x_k_1 - transition_model(x_k_1)))
+    Phi = vectens(-H_xx, R @ (y - observation_model(x_k)))
+    Sigma = P_u + Lambda + Phi
+    K = P_p @ Sigma^(-1)
+    x = x_k + K @ (...)
+    P = P_u - K @ Sigma @ K.T
+    xx = MVNStandard(x, P)
+    return xx
 
-    cholP = chol_S[ny:, ny:]
-
-    G = chol_S[ny:, :ny]
-    I = chol_S[:ny, :ny]
-
-    m = m + G @ solve_triangular(I, y_diff, lower=True)
-    ell = mvn_loglikelihood(y_diff, I)
-    return MVNSqrt(m, cholP), ell
