@@ -1,12 +1,13 @@
-from typing import Callable, Optional, Union
+from typing import Callable, Optional
 
 import jax
 import jax.numpy as jnp
 from jax import jacfwd, jacrev
+from jax.experimental.host_callback import id_print
 from jax.scipy.linalg import cho_solve
 
-from parsmooth._base import MVNStandard, FunctionalModel, are_inputs_compatible, ConditionalMomentsModel
-from parsmooth._utils import none_or_shift, none_or_concat, mvn_loglikelihood
+from parsmooth._base import MVNStandard, FunctionalModel, are_inputs_compatible
+from parsmooth._utils import none_or_shift, none_or_concat
 
 
 def filtering(observations: jnp.ndarray,
@@ -36,8 +37,27 @@ def filtering(observations: jnp.ndarray,
             x_update_nominal = x
         H_x, R, c, H_xx = linearization_method_hessian(observation_model, x_update_nominal)
 
+        # I should use condition in the case of linear with Gaussian noise
+        # def true_fun(H_x, R, c, x, y):
+        #     x = update(H_x, R, c, x, y)
+        #     return x
+        #
+        #
+        # def false_fun(H_x, c, transition_model, observation_model, F_xx, H_xx, x_predict_nominal,
+        #              x_update_nominal, Q,R, y, x):
+        #
+        #     x = update(H_x, R, c, x, y)
+        #     x = _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict_nominal, x_update_nominal, Q,
+        #                        R, y, x)
+        #     return x
+        #
+        #
+        # pred = not jnp.count_nonzero(F_xx) and not jnp.count_nonzero(H_xx)
+        # x = jax.lax.cond(pred, true_fun, false_fun)
+
         x = update(H_x, R, c, x, y)
-        x = _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict_nominal, x_update_nominal, Q, R, y, x)
+        x = _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict_nominal, x_update_nominal, Q,
+                           R, y, x)
         return x, x
 
     predict_traj = none_or_shift(nominal_trajectory, -1)
@@ -85,12 +105,15 @@ def vectens(a, b):
 
 
 def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x_update, Q, R, y, xf):
+    id_print(H_xx)
     mp_nominal, Pp_nominal = x_predict
     mu_nominal, Pu_nominal = x_update
     x_f, P_f = xf
-    Lambda = vectens(-F_xx, Q @ (mu_nominal - transition_model(mp_nominal)))
-    Phi = vectens(-H_xx, R @ (y - observation_model(mu_nominal)))
-    Sigma = P_f + Lambda + Phi
+    f, _ = transition_model
+    h, _ = observation_model
+    Lambda = vectens(-F_xx, Q @ (mu_nominal - f(mp_nominal)))
+    Phi = vectens(-H_xx, R @ (y - h(mu_nominal)))
+    Sigma = P_f + jnp.linalg.inv(Lambda) + jnp.linalg.inv(Phi)
     chol_Sigma = jnp.linalg.cholesky(Sigma)
     K = cho_solve((chol_Sigma, True), P_f.T).T
     x = x_f + K @ (mu_nominal - x_f)
