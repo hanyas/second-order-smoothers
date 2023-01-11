@@ -1,17 +1,17 @@
-from typing import Optional, Callable, Union
+from typing import Optional, Callable
 
 import jax
 import jax.numpy as jnp
 import jax.scipy.linalg as jlag
 
-from parsmooth._base import MVNStandard, MVNSqrt, are_inputs_compatible, FunctionalModel, ConditionalMomentsModel
-from parsmooth._utils import tria, none_or_shift, none_or_concat
+from parsmooth._base import MVNStandard, are_inputs_compatible, FunctionalModel
+from parsmooth._utils import none_or_shift, none_or_concat
 
 
-def smoothing(transition_model: Union[FunctionalModel, ConditionalMomentsModel],
-              filter_trajectory: Union[MVNSqrt, MVNStandard],
+def smoothing(transition_model: FunctionalModel,
+              filter_trajectory: MVNStandard,
               linearization_method: Callable,
-              nominal_trajectory: Optional[Union[MVNSqrt, MVNStandard]] = None):
+              nominal_trajectory: Optional[MVNStandard] = None):
     last_state = jax.tree_map(lambda z: z[-1], filter_trajectory)
 
     if nominal_trajectory is not None:
@@ -19,9 +19,8 @@ def smoothing(transition_model: Union[FunctionalModel, ConditionalMomentsModel],
 
     def smooth_one(F_x, cov_or_chol, b, xf, xs):
         are_inputs_compatible(xf, xs)
-        if isinstance(xf, MVNSqrt):
-            return _sqrt_smooth(F_x, cov_or_chol, b, xf, xs)
         return _standard_smooth(F_x, cov_or_chol, b, xf, xs)
+
 
     def body(smoothed, inputs):
         filtered, ref = inputs
@@ -55,22 +54,3 @@ def _standard_smooth(F, Q, b, xf, xs):
 
     return MVNStandard(ms, Ps)
 
-
-def _sqrt_smooth(F, cholQ, b, xf, xs):
-    mf, cholPf = xf
-    ms, cholPs = xs
-
-    nx = F.shape[0]
-    Phi = jnp.block([[F @ cholPf, cholQ],
-                     [cholPf, jnp.zeros_like(F)]])
-    tria_Phi = tria(Phi)
-    Phi11 = tria_Phi[:nx, :nx]
-    Phi21 = tria_Phi[nx:, :nx]
-    Phi22 = tria_Phi[nx:, nx:]
-    gain = jlag.solve_triangular(Phi11, Phi21.T, trans=True, lower=True).T
-
-    mean_diff = ms - (b + F @ mf)
-    mean = mf + gain @ mean_diff
-    chol = tria(jnp.concatenate([Phi22, gain @ cholPs], axis=1))
-
-    return MVNSqrt(mean, chol)

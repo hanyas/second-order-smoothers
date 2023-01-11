@@ -11,9 +11,9 @@ from parsmooth._utils import none_or_shift, none_or_concat, mvn_loglikelihood
 
 def filtering(observations: jnp.ndarray,
               x0: MVNStandard,
-              transition_model: Union[FunctionalModel, ConditionalMomentsModel],
-              observation_model: Union[FunctionalModel, ConditionalMomentsModel],
-              linearization_method: Callable,
+              transition_model: FunctionalModel,
+              observation_model: FunctionalModel,
+              linearization_method_hessian: Callable,
               nominal_trajectory: Optional[MVNStandard] = None):
     if nominal_trajectory is not None:
         are_inputs_compatible(x0, nominal_trajectory)
@@ -25,25 +25,25 @@ def filtering(observations: jnp.ndarray,
         return _update(H_x, cov_or_chol, c, x, y)
 
     def body(carry, inp):
-        x, ell = carry
-        y, predict_ref, update_ref = inp
+        x = carry
+        y, x_predict_nominal, x_update_nominal = inp
 
-        if predict_ref is None:
-            predict_ref = x
-        F_x, Q, b = linearization_method(transition_model, predict_ref)
+        if x_predict_nominal is None:
+            x_predict_nominal = x
+        F_x, Q, b, F_xx = linearization_method_hessian(transition_model, x_predict_nominal)
         x = predict(F_x, Q, b, x)
-        if update_ref is None:
-            update_ref = x
-        H_x, R, c = linearization_method(observation_model, update_ref, )
+        if x_update_nominal is None:
+            x_update_nominal = x
+        H_x, R, c, H_xx = linearization_method_hessian(observation_model, x_update_nominal)
 
-        x, ell_inc = update(H_x, R, c, x, y)
-        H_xx, F_xx = _pseudo_update(transition_model, observation_model, predict_ref, update_ref, Q, R)
-        return (x, ell + ell_inc), x
+        x = update(H_x, R, c, x, y)
+        x = _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict_nominal, x_update_nominal, Q, R, y, x)
+        return x, x
 
     predict_traj = none_or_shift(nominal_trajectory, -1)
     update_traj = none_or_shift(nominal_trajectory, 1)
 
-    (_, ell), xs = jax.lax.scan(body, (x0, 0.), (observations, predict_traj, update_traj))
+    _, xs = jax.lax.scan(body, x0, (observations, predict_traj, update_traj))
     xs = none_or_concat(xs, x0, 1)
 
     return xs
@@ -69,28 +69,31 @@ def _update(H, R, c, x, y):
 
     m = m + G @ y_diff
     P = P - G @ S @ G.T
-    ell = mvn_loglikelihood(y_diff, chol_S)
-    return MVNStandard(m, P), ell
+    return MVNStandard(m, P)
 
 
 def hessian(f):
     return jacfwd(jacrev(f))
 
 
-vectens = lambda a, b: jnp.sum(a * b[:,None,None], 0)
+def vectens(a, b):
+    """"
+    a is a 3 dimensional tensor
+    b is a 1 dimensional array
+    """
+    return jnp.sum(a * b[:, None, None], 0)
 
 
-def _pseudo_update(transition_model, observation_model, x_predict, x_update, Q, R, y, P):
-    x_k_1, P_p = x_predict
-    x_k, P_u = x_update
-    F_xx = hessian(transition_model)(x_k_1)
-    H_xx = hessian(observation_model)(x_k)
-    Lambda = vectens(-F_xx, Q @ (x_k_1 - transition_model(x_k_1)))
-    Phi = vectens(-H_xx, R @ (y - observation_model(x_k)))
-    Sigma = P_u + Lambda + Phi
-    K = P_p @ Sigma^(-1)
-    x = x_k + K @ (...)
-    P = P_u - K @ Sigma @ K.T
-    xx = MVNStandard(x, P)
-    return xx
+def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x_update, Q, R, y, xf):
+    mp_nominal, Pp_nominal = x_predict
+    mu_nominal, Pu_nominal = x_update
+    x_f, P_f = xf
+    Lambda = vectens(-F_xx, Q @ (mu_nominal - transition_model(mp_nominal)))
+    Phi = vectens(-H_xx, R @ (y - observation_model(mu_nominal)))
+    Sigma = P_f + Lambda + Phi
+    chol_Sigma = jnp.linalg.cholesky(Sigma)
+    K = cho_solve((chol_Sigma, True), P_f.T).T
+    x = x_f + K @ (mu_nominal - x_f)
+    P = P_f - K @ Sigma @ K.T
+    return MVNStandard(x, P)
 
