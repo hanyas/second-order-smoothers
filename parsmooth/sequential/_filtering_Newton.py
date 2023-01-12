@@ -37,24 +37,6 @@ def filtering(observations: jnp.ndarray,
             x_update_nominal = x
         H_x, R, c, H_xx = linearization_method_hessian(observation_model, x_update_nominal)
 
-        # I should use condition in the case of linear with Gaussian noise
-        # def true_fun(H_x, R, c, x, y):
-        #     x = update(H_x, R, c, x, y)
-        #     return x
-        #
-        #
-        # def false_fun(H_x, c, transition_model, observation_model, F_xx, H_xx, x_predict_nominal,
-        #              x_update_nominal, Q,R, y, x):
-        #
-        #     x = update(H_x, R, c, x, y)
-        #     x = _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict_nominal, x_update_nominal, Q,
-        #                        R, y, x)
-        #     return x
-        #
-        #
-        # pred = not jnp.count_nonzero(F_xx) and not jnp.count_nonzero(H_xx)
-        # x = jax.lax.cond(pred, true_fun, false_fun)
-
         x = update(H_x, R, c, x, y)
         x = _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict_nominal, x_update_nominal, Q,
                            R, y, x)
@@ -105,14 +87,16 @@ def vectens(a, b):
 
 
 def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x_update, Q, R, y, xf):
-    id_print(H_xx)
     mp_nominal, Pp_nominal = x_predict
     mu_nominal, Pu_nominal = x_update
     x_f, P_f = xf
     f, _ = transition_model
     h, _ = observation_model
-    Lambda = vectens(-F_xx, Q @ (mu_nominal - f(mp_nominal)))
-    Phi = vectens(-H_xx, R @ (y - h(mu_nominal)))
+    chol_Q = jnp.linalg.cholesky(Q)
+    chol_R = jnp.linalg.cholesky(R)
+    Lambda = vectens(-F_xx, cho_solve((chol_Q, True), mu_nominal - f(mp_nominal)))
+    Phi = vectens(-H_xx, cho_solve((chol_R, True), y - h(mu_nominal)))
+
     Sigma = P_f + jnp.linalg.inv(Lambda) + jnp.linalg.inv(Phi)
     chol_Sigma = jnp.linalg.cholesky(Sigma)
     K = cho_solve((chol_Sigma, True), P_f.T).T

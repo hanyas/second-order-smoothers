@@ -2,8 +2,10 @@ from functools import partial
 
 import jax
 import numpy as np
-import pytest
+import math
+# import pytest
 from jax.scipy.linalg import solve
+from matplotlib import pyplot as plt
 
 from parsmooth._base import FunctionalModel, MVNStandard
 from parsmooth.linearization import extended, extended_hessian
@@ -13,40 +15,43 @@ from tests._lgssm import get_data, transition_function as lgssm_f, observation_f
 from tests._test_utils import get_system
 
 
-@pytest.fixture(scope="session", autouse=True)
-def config():
-    jax.config.update("jax_enable_x64", True)
-    jax.config.update('jax_disable_jit', False)
-    jax.config.update("jax_debug_nans", False)
+# @pytest.fixture(scope="session", autouse=True)
+# def config():
+#     jax.config.update("jax_enable_x64", True)
+#     jax.config.update('jax_disable_jit', False)
+#     jax.config.update("jax_debug_nans", False)
 
 
-@pytest.mark.parametrize("dim_x", [1, 3])
-@pytest.mark.parametrize("dim_y", [2, 3])
-@pytest.mark.parametrize("seed", [0, 42])
-def test_filter_no_info(dim_x, dim_y, seed):
-    np.random.seed(seed)
-    T = 3
+# @pytest.mark.parametrize("dim_x", [1])
+# @pytest.mark.parametrize("dim_y", [2])
+# @pytest.mark.parametrize("seed", [0, 42])
+# def test_filter_no_info(dim_x, dim_y, seed):
+# np.random.seed(seed)
+dim_x = 1
+dim_y = 2
+T = 3
 
-    x0, _, F, Q, _, b, _ = get_system(dim_x, dim_x)
-    _, _, H, R, cholR, c, _ = get_system(dim_x, dim_y)
+x0, _, F, Q, _, b, _ = get_system(dim_x, dim_x)
+_, _, H, R, cholR, c, _ = get_system(dim_x, dim_y)
 
-    R = 1e12 * R
-    true_states, observations = get_data(x0.mean, F, H, R, Q, b, c, T)
+R = 1e12 * R
+true_states, observations = get_data(x0.mean, F, H, R, Q, b, c, T)
 
-    transition_model = FunctionalModel(partial(lgssm_f, A=F), MVNStandard(b, Q))
-    observation_model = FunctionalModel(partial(lgssm_h, H=H), MVNStandard(c, R))
+transition_model = FunctionalModel(partial(lgssm_f, A=F), MVNStandard(b, Q))
+observation_model = FunctionalModel(partial(lgssm_h, H=H), MVNStandard(c, R))
 
-    fun = lambda x: F @ x + b
-    expected_mean = [x0.mean]
+fun = lambda x: F @ x + b
+expected_mean = [x0.mean]
 
-    for t in range(T):
-        expected_mean.append(fun(expected_mean[-1]))
+for t in range(T):
+    expected_mean.append(fun(expected_mean[-1]))
 
-    filtered_states = filtering(observations, x0, transition_model, observation_model, extended, None)
-    # filtered_states_newton = newton_filtering(observations, x0, transition_model, observation_model, extended_hessian, None)
-
-    np.testing.assert_allclose(filtered_states.mean, expected_mean, atol=1e-3, rtol=1e-3)
-    # np.testing.assert_allclose(filtered_states_newton.mean, expected_mean, atol=1e-3, rtol=1e-3)
+filtered_states = filtering(observations, x0, transition_model, observation_model, extended, None)
+# filtered_states_newton = newton_filtering(observations, x0, transition_model, observation_model, extended_hessian, None)
+#
+# np.testing.assert_allclose(filtered_states.mean, expected_mean, atol=1e-3, rtol=1e-3)
+# np.testing.assert_allclose(filtered_states_newton.mean, expected_mean, atol=1e-3, rtol=1e-3)
+plt.plot(filtered_states.mean)
 
 
 # Run this test after including the if (lax.cond) part

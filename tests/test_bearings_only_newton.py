@@ -44,8 +44,8 @@ def test_bearings():
     filtered_states = filtering(ys, init, transition_model, observation_model, extended, None)
     filtered_states_newton = newton_filtering(ys, init, transition_model, observation_model, extended_hessian, None)
     f, _ = transition_model
-    print("hessian", jax.jacfwd(jax.jacrev(f))(m0))
-    # np.testing.assert_array_almost_equal(filtered_states.mean, filtered_states_newton.mean, decimal=3)  # noqa
+    # print("hessian", jax.jacfwd(jax.jacrev(f))(m0))
+    np.testing.assert_array_almost_equal(filtered_states.mean, filtered_states_newton.mean, decimal=3)  # noqa
 
 
     # np.testing.assert_array_almost_equal(filtered_states.mean[1:], expected_mean, decimal=3)  # noqa
