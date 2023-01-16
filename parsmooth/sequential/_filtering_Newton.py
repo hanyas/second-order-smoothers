@@ -94,12 +94,16 @@ def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x
     h, _ = observation_model
     chol_Q = jnp.linalg.cholesky(Q)
     chol_R = jnp.linalg.cholesky(R)
-    Lambda = vectens(-F_xx, cho_solve((chol_Q, True), mu_nominal - f(mp_nominal)))
-    Phi = vectens(-H_xx, cho_solve((chol_R, True), y - h(mu_nominal)))
 
-    Sigma = P_f + jnp.linalg.inv(Lambda) + jnp.linalg.inv(Phi)
-    chol_Sigma = jnp.linalg.cholesky(Sigma)
-    K = cho_solve((chol_Sigma, True), P_f.T).T
+    Lambda = jnp.tensordot(-F_xx.T, cho_solve((chol_Q, True), mu_nominal - f(mp_nominal)), axes=1)
+    Phi = jnp.tensordot(-H_xx.T, cho_solve((chol_R, True), y - h(mu_nominal)), axes=1)
+
+
+    Sigma = P_f + jnp.linalg.inv(Lambda + Phi)
+    # chol_Sigma = jnp.linalg.cholesky(Sigma)
+    # K = cho_solve((chol_Sigma, True), P_f.T).T
+    K = P_f @ jnp.linalg.inv(Sigma)
+
     x = x_f + K @ (mu_nominal - x_f)
     P = P_f - K @ Sigma @ K.T
     return MVNStandard(x, P)
