@@ -3,7 +3,6 @@ from typing import Callable, Optional
 import jax
 import jax.numpy as jnp
 from jax import jacfwd, jacrev
-from jax.experimental.host_callback import id_print
 from jax.scipy.linalg import cho_solve
 
 from parsmooth._base import MVNStandard, FunctionalModel, are_inputs_compatible
