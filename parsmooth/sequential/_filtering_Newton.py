@@ -92,12 +92,9 @@ def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x
     x_f, P_f = xf
     f, _ = transition_model
     h, _ = observation_model
-    chol_Q = jnp.linalg.cholesky(Q)
-    chol_R = jnp.linalg.cholesky(R)
 
-    Lambda = jnp.tensordot(-F_xx.T, cho_solve((chol_Q, True), mu_nominal - f(mp_nominal)), axes=1)
-    Phi = jnp.tensordot(-H_xx.T, cho_solve((chol_R, True), y - h(mu_nominal)), axes=1)
-
+    Lambda = jnp.tensordot(-F_xx.T, Q @ (mu_nominal - f(mp_nominal)), axes=1)
+    Phi = jnp.tensordot(-H_xx.T, R @ (y - h(mu_nominal)), axes=1)
 
     Sigma = P_f + jnp.linalg.inv(Lambda + Phi)
     # chol_Sigma = jnp.linalg.cholesky(Sigma)
