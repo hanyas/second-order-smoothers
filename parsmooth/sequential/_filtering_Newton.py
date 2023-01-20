@@ -3,6 +3,7 @@ from typing import Callable, Optional
 import jax
 import jax.numpy as jnp
 from jax import jacfwd, jacrev
+from jax.experimental.host_callback import id_print
 from jax.scipy.linalg import cho_solve
 
 from parsmooth._base import MVNStandard, FunctionalModel, are_inputs_compatible
@@ -94,11 +95,13 @@ def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x
 
     Lambda = jnp.tensordot(-F_xx.T, Q @ (mu_nominal - f(mp_nominal)), axes=1)
     Phi = jnp.tensordot(-H_xx.T, R @ (y - h(mu_nominal)), axes=1)
-
-    Sigma = P_f + jnp.linalg.inv(Lambda + Phi)
+    nx = Q.shape[0]
+    Sigma = P_f + jnp.linalg.inv(Lambda + Phi + 1e-12*jnp.eye(nx, nx))
+    Sigma = (Sigma + Sigma.T)/2
     # chol_Sigma = jnp.linalg.cholesky(Sigma)
     # K = cho_solve((chol_Sigma, True), P_f.T).T
-    K = P_f @ jnp.linalg.inv(Sigma)
+    K = jax.scipy.linalg.solve(Sigma.T, P_f.T).T
+    # K = P_f @ jnp.linalg.inv(Sigma)
 
     x = x_f + K @ (mu_nominal - x_f)
     P = P_f - K @ Sigma @ K.T
