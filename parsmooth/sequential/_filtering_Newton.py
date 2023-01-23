@@ -15,7 +15,8 @@ def filtering(observations: jnp.ndarray,
               transition_model: FunctionalModel,
               observation_model: FunctionalModel,
               linearization_method_hessian: Callable,
-              nominal_trajectory: Optional[MVNStandard] = None):
+              nominal_trajectory: Optional[MVNStandard] = None,
+              information: bool = True):
     if nominal_trajectory is not None:
         are_inputs_compatible(x0, nominal_trajectory)
 
@@ -100,10 +101,17 @@ def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x
     Sigma = (Sigma + Sigma.T)/2
     # chol_Sigma = jnp.linalg.cholesky(Sigma)
     # K = cho_solve((chol_Sigma, True), P_f.T).T
-    K = jax.scipy.linalg.solve(Sigma.T, P_f.T).T
-    # K = P_f @ jnp.linalg.inv(Sigma)
+    # K = jax.scipy.linalg.solve(Sigma.T, P_f.T).T
+    # # K = P_f @ jnp.linalg.inv(Sigma)
+    #
+    # x = x_f + K @ (mu_nominal - x_f)
+    # P = P_f - K @ Sigma @ K.T
+    #
 
-    x = x_f + K @ (mu_nominal - x_f)
-    P = P_f - K @ Sigma @ K.T
-    return MVNStandard(x, P)
+    # using information form
+    P_inf = jnp.linalg.inv(jnp.linalg.inv(P_f) + Lambda + Phi)
+    temp = (Lambda + Phi) @ mu_nominal + jnp.linalg.inv(P_f)  @ x_f
+    x_inf = P_inf @ temp
+
+    return MVNStandard(x_inf, P_inf)
 
