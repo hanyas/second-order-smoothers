@@ -40,7 +40,7 @@ def filtering(observations: jnp.ndarray,
 
         x = update(H_x, R, c, x, y)
         x = _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict_nominal, x_update_nominal, Q,
-                           R, y, x)
+                           R, y, x, information)
         return x, x
 
     predict_traj = none_or_shift(nominal_trajectory, -1)
@@ -87,31 +87,39 @@ def vectens(a, b):
     return jnp.sum(a * b[:, None, None], 0)
 
 
-def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x_update, Q, R, y, xf):
+def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x_update, Q, R, y, xf, information):
     mp_nominal, Pp_nominal = x_predict
     mu_nominal, Pu_nominal = x_update
     x_f, P_f = xf
     f, _ = transition_model
     h, _ = observation_model
 
-    Lambda = jnp.tensordot(-F_xx.T, Q @ (mu_nominal - f(mp_nominal)), axes=1)
-    Phi = jnp.tensordot(-H_xx.T, R @ (y - h(mu_nominal)), axes=1)
-    nx = Q.shape[0]
-    Sigma = P_f + jnp.linalg.inv(Lambda + Phi + 1e-12*jnp.eye(nx, nx))
-    Sigma = (Sigma + Sigma.T)/2
-    # chol_Sigma = jnp.linalg.cholesky(Sigma)
-    # K = cho_solve((chol_Sigma, True), P_f.T).T
-    # K = jax.scipy.linalg.solve(Sigma.T, P_f.T).T
-    # # K = P_f @ jnp.linalg.inv(Sigma)
-    #
-    # x = x_f + K @ (mu_nominal - x_f)
-    # P = P_f - K @ Sigma @ K.T
+    # print(Q)
+    # print(R)
+    Lambda = jnp.tensordot(-F_xx.T, jnp.linalg.inv(Q) @ (mu_nominal - f(mp_nominal)), axes=1)
+    Phi = jnp.tensordot(-H_xx.T, jnp.linalg.inv(R) @ (y - h(mu_nominal)), axes=1)
+
+    if information:
+
+        P = jnp.linalg.inv(jnp.linalg.inv(P_f) + Lambda + Phi)
+        temp = (Lambda + Phi) @ mu_nominal + jnp.linalg.inv(P_f)  @ x_f
+        x = P @ temp
+    else:
+        nx = Q.shape[0]
+        Sigma = P_f + jnp.linalg.inv(Lambda + Phi + 1e-4*jnp.eye(nx, nx))
+        id_print(jnp.linalg.inv(jnp.linalg.inv(Lambda + Phi + 1e-4*jnp.eye(nx, nx))))
+        Sigma = (Sigma + Sigma.T)/2
+        # chol_Sigma = jnp.linalg.cholesky(Sigma)
+        # K = cho_solve((chol_Sigma, True), P_f.T).T
+        K = jax.scipy.linalg.solve(Sigma.T, P_f.T).T
+        # K = P_f @ jnp.linalg.inv(Sigma)
+        # id_print(K)
+        x = x_f + K @ (mu_nominal - x_f)
+        P = P_f - K @ Sigma @ K.T
     #
 
     # using information form
-    P_inf = jnp.linalg.inv(jnp.linalg.inv(P_f) + Lambda + Phi)
-    temp = (Lambda + Phi) @ mu_nominal + jnp.linalg.inv(P_f)  @ x_f
-    x_inf = P_inf @ temp
 
-    return MVNStandard(x_inf, P_inf)
+
+    return MVNStandard(x, P)
 
