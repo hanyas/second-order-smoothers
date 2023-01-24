@@ -1,8 +1,8 @@
 from typing import Optional, Callable
 
 import jax
-import jax.numpy as jnp
 import jax.scipy.linalg as jlag
+from jax.experimental.host_callback import id_print
 
 from parsmooth._base import MVNStandard, are_inputs_compatible, FunctionalModel
 from parsmooth._utils import none_or_shift, none_or_concat
@@ -46,6 +46,7 @@ def _standard_smooth(F, Q, b, xf, xs):
 
     mean_diff = ms - (b + F @ mf)
     S = F @ Pf @ F.T + Q
+
     cov_diff = Ps - S
 
     gain = Pf @ jlag.solve(S, F, sym_pos=True).T

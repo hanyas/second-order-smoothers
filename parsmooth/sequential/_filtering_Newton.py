@@ -94,32 +94,25 @@ def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x
     f, _ = transition_model
     h, _ = observation_model
 
-    # print(Q)
-    # print(R)
     Lambda = jnp.tensordot(-F_xx.T, jnp.linalg.inv(Q) @ (mu_nominal - f(mp_nominal)), axes=1)
     Phi = jnp.tensordot(-H_xx.T, jnp.linalg.inv(R) @ (y - h(mu_nominal)), axes=1)
 
     if information:
-
         P = jnp.linalg.inv(jnp.linalg.inv(P_f) + Lambda + Phi)
         temp = (Lambda + Phi) @ mu_nominal + jnp.linalg.inv(P_f)  @ x_f
         x = P @ temp
     else:
         nx = Q.shape[0]
         Sigma = P_f + jnp.linalg.inv(Lambda + Phi + 1e-4*jnp.eye(nx, nx))
-        id_print(jnp.linalg.inv(jnp.linalg.inv(Lambda + Phi + 1e-4*jnp.eye(nx, nx))))
         Sigma = (Sigma + Sigma.T)/2
         # chol_Sigma = jnp.linalg.cholesky(Sigma)
         # K = cho_solve((chol_Sigma, True), P_f.T).T
         K = jax.scipy.linalg.solve(Sigma.T, P_f.T).T
         # K = P_f @ jnp.linalg.inv(Sigma)
-        # id_print(K)
-        x = x_f + K @ (mu_nominal - x_f)
+        y_diff = mu_nominal - x_f
+
+        x = x_f + K @ y_diff
         P = P_f - K @ Sigma @ K.T
-    #
-
-    # using information form
-
 
     return MVNStandard(x, P)
 
