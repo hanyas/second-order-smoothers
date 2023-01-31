@@ -103,11 +103,11 @@ def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x
         x = P @ temp
     else:
         nx = Q.shape[0]
-        Sigma = P_f + jnp.linalg.inv(Lambda + Phi + 1e-4*jnp.eye(nx, nx))
+        Sigma = P_f + jnp.linalg.inv(Lambda + Phi)
         Sigma = (Sigma + Sigma.T)/2
-        # chol_Sigma = jnp.linalg.cholesky(Sigma)
-        # K = cho_solve((chol_Sigma, True), P_f.T).T
-        K = jax.scipy.linalg.solve(Sigma.T, P_f.T).T
+        chol_Sigma = jnp.linalg.cholesky(Sigma)
+        K = cho_solve((chol_Sigma, True), P_f.T).T
+        # K = jax.scipy.linalg.solve(Sigma.T, P_f.T).T
         # K = P_f @ jnp.linalg.inv(Sigma)
         y_diff = mu_nominal - x_f
 
