@@ -104,6 +104,7 @@ def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x
     else:
         nx = Q.shape[0]
         Sigma = P_f + jnp.linalg.inv(Lambda + Phi)
+        id_print(Sigma)
         Sigma = (Sigma + Sigma.T)/2
         chol_Sigma = jnp.linalg.cholesky(Sigma)
         K = cho_solve((chol_Sigma, True), P_f.T).T
