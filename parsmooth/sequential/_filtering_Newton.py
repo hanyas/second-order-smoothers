@@ -3,7 +3,6 @@ from typing import Callable, Optional
 import jax
 import jax.numpy as jnp
 from jax import jacfwd, jacrev
-from jax.experimental.host_callback import id_print
 from jax.scipy.linalg import cho_solve
 
 from parsmooth._base import MVNStandard, FunctionalModel, are_inputs_compatible
@@ -106,7 +105,7 @@ def vectens(a, b):
     return jnp.sum(a * b[:, None, None], 0)
 
 
-def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x_update, Q, R, y, xf,x_p_1, information):
+def _pseudo_update(transition_model, observation_model, F_xx, H_xx, x_predict, x_update, Q, R, y, xf, x_p_1, information):
     mp_nominal, Pp_nominal = x_predict
     mu_nominal, Pu_nominal = x_update
     x_f, P_f = xf
