@@ -9,6 +9,8 @@ from parsmooth.parallel._filtering import filtering as par_filtering
 from parsmooth.parallel._smoothing import smoothing as par_smoothing
 from parsmooth.sequential._filtering import filtering as seq_filtering
 from parsmooth.sequential._smoothing import smoothing as seq_smoothing
+from parsmooth.sequential._filtering_Newton import filtering as newton_filtering
+from parsmooth.sequential._smoothing_Newton import smoothing as newton_smoothing
 
 
 def filtering(observations: jnp.ndarray,
@@ -49,6 +51,42 @@ def filter_smoother(observations: jnp.ndarray,
 
 def _default_criterion(_i, nominal_traj_prev, curr_nominal_traj):
     return jnp.mean((nominal_traj_prev.mean - curr_nominal_traj.mean) ** 2) > 1e-6
+
+
+def filter_smoother_Newton(observations: jnp.ndarray,
+                           x0: Union[MVNSqrt, MVNStandard],
+                           transition_model: Union[FunctionalModel, ConditionalMomentsModel],
+                           observation_model: Union[FunctionalModel, ConditionalMomentsModel],
+                           linearization_method_hessian,
+                           linearization_method: Callable,
+                           nominal_trajectory: Optional[Union[MVNSqrt, MVNStandard]] = None,
+                           information: bool = True):
+    filter_trajectory = newton_filtering(observations, x0, transition_model, observation_model, linearization_method_hessian,
+                                         nominal_trajectory, information)
+    return newton_smoothing(transition_model, filter_trajectory, linearization_method, nominal_trajectory)
+
+
+
+def iterated_smoothing_Newton(observations: jnp.ndarray,
+                              x0: Union[MVNSqrt, MVNStandard],
+                              transition_model: Union[FunctionalModel, ConditionalMomentsModel],
+                              observation_model: Union[FunctionalModel, ConditionalMomentsModel],
+                              linearization_method_hessian,
+                              linearization_method: Callable,
+                              init_nominal_trajectory: Optional[Union[MVNSqrt, MVNStandard]] = None,
+                              information: bool = True,
+                              criterion: Callable = _default_criterion):
+    if init_nominal_trajectory is None:
+        init_nominal_trajectory = filter_smoother_Newton(observations, x0, transition_model, observation_model,
+                                                         linearization_method_hessian, linearization_method, None, information)
+
+    def fun_to_iter(curr_nominal_traj):
+        return filter_smoother_Newton(observations, x0, transition_model, observation_model, linearization_method_hessian, linearization_method,
+                                      curr_nominal_traj, information)
+
+    nominal_traj = fixed_point(fun_to_iter, init_nominal_trajectory, criterion)
+
+    return nominal_traj
 
 
 def iterated_smoothing(observations: jnp.ndarray,

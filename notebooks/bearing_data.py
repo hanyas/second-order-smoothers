@@ -44,6 +44,44 @@ def _transition_function(x, dt):
     return F @ x
 
 
+def _transition_function_dx(x, dt):
+    w = x[-1]
+    predicate = jnp.abs(w) < 1e-6
+
+    def true_fun(_):
+        coswt = 1.
+        coswto = 0.
+        coswtopw = 0.
+        sinwt = 0.
+        sinwtpw = dt
+
+        dsinwtpw = 0.
+        dcoswtopw = -0.5 * dt ** 2
+        return coswt, coswto, coswtopw, sinwt, sinwtpw, dsinwtpw, dcoswtopw
+
+    def false_fun(_):
+        coswt = jnp.cos(w * dt)
+        coswto = jnp.cos(w * dt) - 1
+        coswtopw = coswto / w
+
+        sinwt = jnp.sin(w * dt)
+        sinwtpw = sinwt / w
+
+        dsinwtpw = (w * dt * coswt - sinwt) / (w ** 2)
+        dcoswtopw = (-w * dt * sinwt - coswto) / (w ** 2)
+        return coswt, coswto, coswtopw, sinwt, sinwtpw, dsinwtpw, dcoswtopw
+
+    coswt, coswto, coswtopw, sinwt, sinwtpw, dsinwtpw, dcoswtopw = lax.cond(predicate, true_fun, false_fun, None)
+
+    df = jnp.array([[1., 0., sinwtpw, -coswtopw, dsinwtpw * x[2] - dcoswtopw * x[3]],
+                    [0, 1, coswtopw, sinwtpw, dcoswtopw * x[2] + dsinwtpw * x[3]],
+                    [0, 0, coswt, sinwt, -dt * sinwt * x[2] + dt * coswt * x[3]],
+                    [0, 0, -sinwt, coswt, -dt * coswt * x[2] - dt * sinwt * x[3]],
+                    [0, 0, 0, 0, 1]])
+
+    return df
+
+
 def _observation_function(x, s1, s2):
     """
     Returns the observed angles as function of the state and the sensors locations
@@ -62,6 +100,11 @@ def _observation_function(x, s1, s2):
     """
     return jnp.array([jnp.arctan2(x[1] - s1[1], x[0] - s1[0]),
                       jnp.arctan2(x[1] - s2[1], x[0] - s2[0])])
+
+
+def _observation_function_dx(x, s1, s2):
+    return jnp.array([[-(x[1]-s1[1])/((x[0]-s1[0])**2+(x[1]-s1[1])**2), (x[0]-s1[0])/((x[0]-s1[0])**2+(x[1]-s1[1])**2),  0, 0, 0],
+                             [-(x[1]-s2[1])/((x[0]-s2[0])**2+(x[1]-s2[1])**2), (x[0]-s2[0])/((x[0]-s2[0])**2+(x[1]-s2[1])**2),  0, 0, 0]])
 
 
 @partial(jnp.vectorize, excluded=(1, 2), signature="(m)->(d)")
@@ -130,8 +173,10 @@ def make_parameters(qc, qw, r, dt, s1, s2):
 
     observation_function = jit(partial(_observation_function, s1=s1, s2=s2))
     transition_function = jit(partial(_transition_function, dt=dt))
+    observation_function_dx = jit(partial(_observation_function_dx, s1=s1, s2=s2))
+    transition_function_dx = jit(partial(_transition_function_dx, dt=dt))
 
-    return Q, R, observation_function, transition_function
+    return Q, R, observation_function, transition_function, observation_function_dx, transition_function_dx
 
 
 def _get_data(x, dt, a_s, s1, s2, r, normals, observations, true_states):
