@@ -3,8 +3,6 @@ from typing import Callable, Optional
 import jax
 import jax.numpy as jnp
 import jax.scipy.linalg as jlinalg
-from jax import jacfwd, jacrev
-from jax.experimental.host_callback import id_print
 from jax.scipy.linalg import cho_solve
 
 from parsmooth._base import MVNStandard, FunctionalModel, are_inputs_compatible
@@ -22,11 +20,13 @@ def mvn_loglikelihood(x, chol_cov):
     norm_y = jnp.sum(y * y, -1)
     return -0.5 * norm_y - normalizing_constant
 
+
 def L(predict_trajectory, update_trajectory, z, measurement_fun, dynamic_fun, chol_Q, chol_R):
     mp_nominal = predict_trajectory
     mu_nominal = update_trajectory
     cost = 2 * mvn_loglikelihood(mu_nominal - dynamic_fun(mp_nominal), chol_Q) + 2 * mvn_loglikelihood(z - measurement_fun(mu_nominal), chol_R)
     return -cost
+
 
 def state_space_cost(x, ys, observation_function, transition_function, Q, R, m0, P0):
     x0 = x[0]
@@ -35,8 +35,8 @@ def state_space_cost(x, ys, observation_function, transition_function, Q, R, m0,
     vmapped_fun = jax.vmap(L, in_axes=[0, 0, 0, None, None, None, None])
     return jnp.sum(vmapped_fun(predict_traj, update_traj, ys, observation_function, transition_function, jnp.linalg.cholesky(Q), jnp.linalg.cholesky(R))) - 2 * mvn_loglikelihood(x0 - m0, jnp.linalg.cholesky(P0))
 
+
 def LM_Newton(current_nomminal_trajectory: Optional[MVNStandard],
-              current_cost_function: jnp.array,
               ys: jnp.ndarray,
               init: MVNStandard,
               observation_model: FunctionalModel,
@@ -44,25 +44,28 @@ def LM_Newton(current_nomminal_trajectory: Optional[MVNStandard],
               linearization_method_hessian: Callable,
               linearization_method,
               nu: jnp.ndarray = 10.,
-              lam: jnp.ndarray = 1e-2):
+              lam: jnp.ndarray = 1e-2,
+              n_iter: int = 10):
     m0, P0 = init
-    transition_function, Q = transition_model
-    observation_function, R = observation_model
+    transition_function, Q = transition_model[0], transition_model[1].cov
+    observation_function, R = observation_model[0], observation_model[1].cov
+    J1 = state_space_cost(current_nomminal_trajectory.mean, ys, observation_function, transition_function, Q, R, m0, P0)
 
-    nominal_trajectory = current_nomminal_trajectory
-    J1 = state_space_cost(nominal_trajectory, ys, observation_function, transition_function, Q, R, m0, P0)
+    def body(carry, _):
+        nominal_trajectory, lam_param, J = carry
+        nu = 10.
+        filtered_newton = newton_filtering_lam(ys, init, transition_model, observation_model, linearization_method_hessian, nominal_trajectory, lam_param, True)
+        smoothed_newton = newton_smoothing(transition_model, filtered_newton, linearization_method, nominal_trajectory)
 
-    filtered_newton = newton_filtering_lam(ys, init, transition_model, observation_model, linearization_method_hessian, nominal_trajectory, nu, lam, True)
-    smoothed_newton = newton_smoothing(transition_model, filtered_newton, linearization_method, nominal_trajectory)
-    #
-    J2 = state_space_cost(smoothed_newton, ys, observation_function, transition_function, Q, R, m0, P0)
+        J_new = state_space_cost(smoothed_newton.mean, ys, observation_function, transition_function, Q, R, m0, P0)
 
-    if J2 < J1:
-        lam = lam / nu
-    else:
-        lam = nu * lam
+        lam_param, J = jax.lax.cond(J_new < J, lambda _: (lam_param / nu, J_new), lambda _: (nu * lam_param, J), operand=None)
 
-    return
+        return (smoothed_newton, lam_param, J), J
+
+    LM_smoothed_trajectories, Js = jax.lax.scan(body, (current_nomminal_trajectory, lam, J1), jnp.arange(n_iter))
+
+    return LM_smoothed_trajectories, Js
 
 
 def newton_filtering_lam(observations: jnp.ndarray,
@@ -71,12 +74,12 @@ def newton_filtering_lam(observations: jnp.ndarray,
                          observation_model: FunctionalModel,
                          linearization_method_hessian: Callable,
                          nominal_trajectory: Optional[MVNStandard] = None,
-                         nu: jnp.ndarray = 10.,
                          lam: jnp.ndarray = 1e-2,
                          information: bool = True):
     if nominal_trajectory is not None:
         are_inputs_compatible(x0, nominal_trajectory)
 
+    # first step
     f, _ = transition_model
     F, Q, _, F_xx = linearization_method_hessian(transition_model, x0)
     P0_inv = jnp.linalg.inv(x0.cov)
@@ -87,6 +90,7 @@ def newton_filtering_lam(observations: jnp.ndarray,
     P0_Newton_LM = jnp.linalg.inv(P0_inv + Psi0 + 1/lam * S0)
     x0_Newton = MVNStandard(x0.mean, P0_Newton_LM)
 
+    # middle steps
     def predict(F_x, cov_or_chol, b, x):
         return _predict(F_x, cov_or_chol, b, x)
 
@@ -114,9 +118,9 @@ def newton_filtering_lam(observations: jnp.ndarray,
     predict_traj = none_or_shift(nominal_trajectory, -1)
     update_traj = none_or_shift(nominal_trajectory, 1)
 
-    x, xs = jax.lax.scan(body, x0_Newton, (
-    observations[:-1], none_or_shift(predict_traj, -1), none_or_shift(update_traj, -1), none_or_shift(update_traj, 1)))
+    x, xs = jax.lax.scan(body, x0_Newton, (observations[:-1], none_or_shift(predict_traj, -1), none_or_shift(update_traj, -1), none_or_shift(update_traj, 1)))
 
+    # last step
     F_x, Q, b, F_xx = linearization_method_hessian(transition_model,
                                                    MVNStandard(predict_traj.mean[-1], predict_traj.cov[-1]))
     x = predict(F_x, Q, b, x)
@@ -172,8 +176,8 @@ def _pseudo_update(transition_model,
 
     mu_nominal, Pu_nominal = x_update
     x_f, P_f = xf
-    f, Q = transition_model
-    h, R = observation_model
+    f, Q = transition_model[0], transition_model[1].cov
+    h, R = observation_model[0], observation_model[1].cov
     x_p_1_, _ = x_p_1
 
     Q_inv = jnp.linalg.inv(Q)
