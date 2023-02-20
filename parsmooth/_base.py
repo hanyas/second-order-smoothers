@@ -12,6 +12,18 @@ class MVNSqrt(NamedTuple):
     chol: Any
 
 
+class LinearTransition(NamedTuple):
+    F_x: Any
+    f0: Any
+    Q: Any
+
+
+class LinearObservation(NamedTuple):
+    H_x: Any
+    h0: Any
+    R: Any
+
+
 class FunctionalModel(NamedTuple):
     function: Callable
     mvn: Union[MVNSqrt, MVNStandard]
