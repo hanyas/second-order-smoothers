@@ -7,7 +7,7 @@ from parsmooth.methods import iterated_smoothing
 
 from parsmooth.linearization import extended, second_order
 
-from parsmooth.sequential._tr_newton import _recursive_iterated_newton_smoother
+from parsmooth.sequential._tr_newton import _iterated_recursive_newton_smoother
 from parsmooth.sequential._tr_newton import log_posterior
 
 import matplotlib.pyplot as plt
@@ -47,7 +47,7 @@ nominal_trajectory.mean.at[0].set(initial_dist.mean)
 nominal_trajectory.cov.at[0].set(initial_dist.cov)
 
 # Newton Recursive Iterated Smoother
-newton_smoothed = _recursive_iterated_newton_smoother(observations, initial_dist,
+newton_smoothed = _iterated_recursive_newton_smoother(observations, initial_dist,
                                                       transition_model, observation_model,
                                                       second_order, extended,
                                                       nominal_trajectory,

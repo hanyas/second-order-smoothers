@@ -7,7 +7,7 @@ from parsmooth.methods import iterated_smoothing
 
 from parsmooth.linearization import extended
 
-from parsmooth.sequential._bfgs import _batch_iterated_bfgs_smoother
+from parsmooth.sequential._bfgs import _iterated_batch_bfgs_smoother
 from parsmooth.sequential._bfgs import log_posterior
 
 import matplotlib.pyplot as plt
@@ -47,7 +47,7 @@ nominal_trajectory.mean.at[0].set(initial_dist.mean)
 nominal_trajectory.cov.at[0].set(initial_dist.cov)
 
 # BFGS Batch Iterated Smoother
-bfgs_smoothed = _batch_iterated_bfgs_smoother(observations, initial_dist,
+bfgs_smoothed = _iterated_batch_bfgs_smoother(observations, initial_dist,
                                               transition_model, observation_model,
                                               nominal_trajectory.mean,
                                               n_iter=100)[0]

@@ -7,7 +7,7 @@ from parsmooth.methods import iterated_smoothing
 
 from parsmooth.linearization import extended, second_order
 
-from parsmooth.sequential._tr_newton import _batch_iterated_newton_smoother
+from parsmooth.sequential._tr_newton import _iterated_batch_newton_smoother
 from parsmooth.sequential._tr_newton import log_posterior
 
 import matplotlib.pyplot as plt
@@ -47,7 +47,7 @@ nominal_trajectory.mean.at[0].set(initial_dist.mean)
 nominal_trajectory.cov.at[0].set(initial_dist.cov)
 
 # Gauss-Newton Batch Iterated Smoother
-newton_smoothed = _batch_iterated_newton_smoother(observations, initial_dist,
+newton_smoothed = _iterated_batch_newton_smoother(observations, initial_dist,
                                                   transition_model, observation_model,
                                                   second_order, nominal_trajectory.mean,
                                                   lmbda=1e1, nu=2.0, n_iter=25)[0]

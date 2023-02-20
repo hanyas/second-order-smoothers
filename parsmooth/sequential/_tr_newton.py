@@ -15,7 +15,7 @@ from parsmooth.sequential._smoothing_newton import smoothing as newton_smoothing
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
 
-def _batch_iterated_newton_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
+def _iterated_batch_newton_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
                                     transition_model: FunctionalModel, observation_model: FunctionalModel,
                                     quadratization_method: Callable, nominal_mean: jnp.ndarray,
                                     lmbda: float = 1e2, nu: float = 2.0, n_iter: int = 10):
@@ -82,7 +82,7 @@ def _batch_iterated_newton_smoother(observations: jnp.ndarray, initial_dist: MVN
     return nominal_mean, jnp.hstack((init_cost, costs))
 
 
-def _recursive_iterated_newton_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
+def _iterated_recursive_newton_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
                                         transition_model: FunctionalModel, observation_model: FunctionalModel,
                                         quadratization_method: Callable, linearization_method: Callable,
                                         nominal_trajectory: MVNStandard,

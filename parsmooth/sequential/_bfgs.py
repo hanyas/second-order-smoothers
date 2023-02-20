@@ -11,7 +11,7 @@ from parsmooth._base import MVNStandard, FunctionalModel
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
 
-def _batch_iterated_bfgs_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
+def _iterated_batch_bfgs_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
                                   transition_model: FunctionalModel, observation_model: FunctionalModel,
                                   nominal_mean: jnp.ndarray, n_iter: int = 10):
 
