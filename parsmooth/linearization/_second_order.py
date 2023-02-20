@@ -1,12 +1,14 @@
-from typing import Tuple, Any
+from typing import Tuple, Any, Union, Callable
 
 import jax
+import jax.numpy as jnp
 
 from parsmooth import FunctionalModel, MVNStandard
 from parsmooth._base import are_inputs_compatible
 
 
-def second_order(model: FunctionalModel, x: MVNStandard):
+def second_order(model: Union[FunctionalModel, Callable],
+                 x: Union[MVNStandard, jnp.ndarray]):
     """
     Quadratization for a non-linear function f(x, q).
     If the function is linear, JAX Jacobian calculation will
@@ -22,19 +24,20 @@ def second_order(model: FunctionalModel, x: MVNStandard):
     Returns
     -------
     F_x, F_q, res: jnp.ndarray
-        The linearization parameters
-    cov_q: jnp.ndarray
-        Either the cholesky or the full-rank modified covariance matrix
+        Linearization parameters
     F_xx: jnp.ndarray
         The hessian
+    cov_q: jnp.ndarray
+        Either the cholesky or the full-rank modified covariance matrix
     """
-    f, q = model
+    if isinstance(model, FunctionalModel):
+        f, q = model
+        are_inputs_compatible(x, q)
 
-    if isinstance(x, MVNStandard):
         m_x, _ = x
         return _standard_second_order_callable(f, m_x, *q)
     else:
-        return _second_order_callable_common(f, x)
+        return _second_order_callable_common(model, x)
 
 
 def _second_order_callable_common(f, x) -> Tuple[Any, Any, Any]:

@@ -17,7 +17,7 @@ logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
 def _batch_iterated_newton_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
                                     transition_model: FunctionalModel, observation_model: FunctionalModel,
-                                    nominal_mean: jnp.ndarray,
+                                    quadratization_method: Callable, nominal_mean: jnp.ndarray,
                                     lmbda: float = 1e2, nu: float = 2.0, n_iter: int = 10):
 
     flat_nominal_mean, unravel = ravel_pytree(nominal_mean)
@@ -277,8 +277,8 @@ def jac_and_hess(observations: jnp.ndarray,
     m_curr = nominal_mean[:-1]
     m_next = nominal_mean[1:]
 
-    f0, F_x, F_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(transition_model, m_curr)
-    h0, H_x, H_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(observation_model, m_next)
+    f0, F_x, F_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(f, m_curr)
+    h0, H_x, H_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(h, m_next)
 
     T = nominal_mean.shape[0]
     nx = Q.shape[-1]
