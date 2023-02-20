@@ -206,48 +206,48 @@ def newton_state_space(observations: jnp.ndarray,
     y = observations
     m0, P0 = initial_dist
 
-    f, (_, Q) = transition_model
-    h, (_, R) = observation_model
+    f, _ = transition_model
+    h, _ = observation_model
 
     curr_nominal = none_or_shift(nominal_trajectory, -1)
     next_nominal = none_or_shift(nominal_trajectory, 1)
 
-    f0, F_x, F_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(f, curr_nominal)
-    h0, H_x, H_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(h, next_nominal)
+    F_xx, F_x, Q, f0 = jax.vmap(quadratization_method, in_axes=(None, 0))(transition_model, curr_nominal)
+    H_xx, H_x, R, h0 = jax.vmap(quadratization_method, in_axes=(None, 0))(observation_model, next_nominal)
 
-    nx = Q.shape[0]
-    ny = R.shape[0]
+    nx = Q.shape[-1]
+    ny = R.shape[-1]
 
-    def _dynamics_hessian(F_xx, m_next, m_curr):
+    def _dynamics_hessian(F_xx, Q, m_next, m_curr):
         return - jnp.einsum('ijk,k->ij', F_xx.T, jnp.linalg.solve(Q, m_next - f(m_curr)))
 
-    def _observation_hessian(H_xx, y, m_next):
+    def _observation_hessian(H_xx, R, y, m_next):
         return - jnp.einsum('ijk,k->ij', H_xx.T, jnp.linalg.solve(R, y - h(m_next)))
 
     m_curr = curr_nominal.mean
     m_next = next_nominal.mean
 
-    Phi = jax.vmap(_dynamics_hessian)(F_xx, m_next, m_curr)
-    Gamma = jax.vmap(_observation_hessian)(H_xx, y, m_next)
+    Phi = jax.vmap(_dynamics_hessian)(F_xx, Q, m_next, m_curr)
+    Gamma = jax.vmap(_observation_hessian)(H_xx, R, y, m_next)
 
     # first time step
     l0 = m0
     L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + Phi[0] + lmbda * jnp.eye(nx))
 
     # intermediate time steps
-    def _observation_model(H_x, h0, Phi, Gamma):
+    def _observation_model(H_x, h0, R, Phi, Gamma):
         G_x = jnp.vstack((H_x, jnp.eye(nx)))
         g0 = jnp.hstack((h0, jnp.zeros((nx,))))
         W = jsc.linalg.block_diag(R, jnp.linalg.inv(Phi + Gamma + lmbda * jnp.eye(nx)))
         return G_x, g0, W
 
-    G_x, g0, W = jax.vmap(_observation_model)(H_x[:-1], h0[:-1],
+    G_x, g0, W = jax.vmap(_observation_model)(H_x[:-1], h0[:-1], R[:-1],
                                               Phi[1:], Gamma[:-1])
 
     # final time step
     _G_x = jnp.vstack((H_x[-1], jnp.eye(nx)))
     _g0 = jnp.hstack((h0[-1], jnp.zeros((nx,))))
-    _W = jsc.linalg.block_diag(R, jnp.linalg.inv(Gamma[-1] + lmbda * jnp.eye(nx)))
+    _W = jsc.linalg.block_diag(R[-1], jnp.linalg.inv(Gamma[-1] + lmbda * jnp.eye(nx)))
 
     G_x = jnp.stack((*G_x, _G_x))
     g0 = jnp.vstack((g0, _g0))
