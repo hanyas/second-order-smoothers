@@ -25,18 +25,6 @@ def _batch_iterated_bfgs_smoother(observations: jnp.ndarray, initial_dist: MVNSt
     T, nx = nominal_mean.shape
     hess = jnp.eye(flat_nominal_mean.shape[0])
 
-    # off-diagonal
-    def _off_diagonal(carry, args):
-        t = args
-        hess = carry
-
-        val = jnp.eye(nx)
-        hess = jax.lax.dynamic_update_slice(hess, val, ((t + 1) * nx, t * nx))
-        hess = jax.lax.dynamic_update_slice(hess, val.T, (t * nx, (t + 1) * nx))
-        return hess, hess
-
-    hess, _ = jax.lax.scan(_off_diagonal, hess, jnp.arange(T - 1))
-
     jac = jax.jacobian(_flattend_log_posterior)(flat_nominal_mean)
     init_cost = _flattend_log_posterior(flat_nominal_mean)
 
