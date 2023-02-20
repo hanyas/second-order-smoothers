@@ -9,8 +9,8 @@ from parsmooth.parallel._filtering import filtering as par_filtering
 from parsmooth.parallel._smoothing import smoothing as par_smoothing
 from parsmooth.sequential._filtering import filtering as seq_filtering
 from parsmooth.sequential._smoothing import smoothing as seq_smoothing
-from parsmooth.sequential._filtering_Newton import filtering as newton_filtering
-from parsmooth.sequential._smoothing_Newton import smoothing as newton_smoothing
+from parsmooth.sequential._filtering_newton import filtering as newton_filtering
+from parsmooth.sequential._smoothing_newton import smoothing as newton_smoothing
 
 
 def filtering(observations: jnp.ndarray,

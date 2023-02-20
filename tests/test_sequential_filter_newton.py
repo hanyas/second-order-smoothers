@@ -8,9 +8,9 @@ from jax.scipy.linalg import solve
 from matplotlib import pyplot as plt
 
 from parsmooth._base import FunctionalModel, MVNStandard
-from parsmooth.linearization import extended, extended_hessian
+from parsmooth.linearization import extended, second_order
 from parsmooth.sequential._filtering import filtering
-from parsmooth.sequential._filtering_Newton import filtering as newton_filtering
+from parsmooth.sequential._filtering_newton import filtering as newton_filtering
 from tests._lgssm import get_data, transition_function as lgssm_f, observation_function as lgssm_h
 from tests._test_utils import get_system
 

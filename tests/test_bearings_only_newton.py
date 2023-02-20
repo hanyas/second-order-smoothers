@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 
 from parsmooth._base import MVNStandard, FunctionalModel
-from parsmooth.linearization import extended, extended_hessian
+from parsmooth.linearization import extended, second_order
 from parsmooth.methods import iterated_smoothing
 from parsmooth.sequential._filtering import filtering
-from parsmooth.sequential._filtering_Newton import filtering as newton_filtering
+from parsmooth.sequential._filtering_newton import filtering as newton_filtering
 from tests.bearings.bearings_utils import make_parameters
 
 
