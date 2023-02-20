@@ -28,7 +28,7 @@ dt = 0.01  # discretization time step
 qc = 0.01  # discretization noise
 qw = 0.1  # discretization noise
 
-T = 50  # number of observations
+T = 500  # number of observations
 nx, ny = 5, 2
 
 _, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
@@ -48,10 +48,10 @@ nominal_trajectory.cov.at[0].set(initial_dist.cov)
 
 # Newton Recursive Iterated Smoother
 newton_smoothed = _recursive_iterated_newton_smoother(observations, initial_dist,
-                                                        transition_model, observation_model,
-                                                        second_order, extended,
-                                                        nominal_trajectory,
-                                                        lmbda=1e1, nu=2.0, n_iter=100)[0]
+                                                      transition_model, observation_model,
+                                                      second_order, extended,
+                                                      nominal_trajectory,
+                                                      lmbda=1e1, nu=2.0, n_iter=100)[0]
 
 newton_cost = log_posterior(newton_smoothed.mean, observations,
                             initial_dist, transition_model, observation_model)

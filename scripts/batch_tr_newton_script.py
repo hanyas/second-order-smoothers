@@ -5,7 +5,7 @@ from parsmooth import MVNStandard
 from parsmooth import FunctionalModel
 from parsmooth.methods import iterated_smoothing
 
-from parsmooth.linearization import extended
+from parsmooth.linearization import extended, second_order
 
 from parsmooth.sequential._tr_newton import _batch_iterated_newton_smoother
 from parsmooth.sequential._tr_newton import log_posterior
@@ -31,7 +31,7 @@ qw = 0.1  # discretization noise
 T = 500  # number of observations
 nx, ny = 5, 2
 
-_, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=17)
+_, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
 
 Q, R, transition_function, observation_function, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
 
@@ -49,7 +49,7 @@ nominal_trajectory.cov.at[0].set(initial_dist.cov)
 # Gauss-Newton Batch Iterated Smoother
 newton_smoothed = _batch_iterated_newton_smoother(observations, initial_dist,
                                                   transition_model, observation_model,
-                                                  nominal_trajectory.mean,
+                                                  second_order, nominal_trajectory.mean,
                                                   lmbda=1e1, nu=2.0, n_iter=25)[0]
 
 newton_cost = log_posterior(newton_smoothed, observations,
