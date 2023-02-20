@@ -9,7 +9,7 @@ from jax.flatten_util import ravel_pytree
 from parsmooth._base import MVNStandard, FunctionalModel
 from parsmooth._base import LinearTransition, LinearObservation
 from parsmooth._utils import none_or_shift, none_or_concat
-from parsmooth.sequential._smoothing_newton import smoothing as newton_smoothing
+from parsmooth.sequential._smoothing import smoothing as newton_smoothing
 
 
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
