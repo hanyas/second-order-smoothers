@@ -23,6 +23,7 @@ def filtering(observations: jnp.ndarray,
     _, Q, _, F_xx = linearization_method_hessian(transition_model, x0)
     P0_Newton = jnp.linalg.inv(jnp.linalg.inv(x0.cov) + jnp.tensordot(-F_xx.T, jnp.linalg.inv(Q) @ (nominal_trajectory.mean[1] - f(x0.mean)), axes=1))
     x0_Newton = MVNStandard(x0.mean, P0_Newton)
+
     def predict(F_x, cov_or_chol, b, x):
         return _predict(F_x, cov_or_chol, b, x)
 
@@ -52,7 +53,6 @@ def filtering(observations: jnp.ndarray,
     update_traj = none_or_shift(nominal_trajectory, 1)
 
     x, xs = jax.lax.scan(body, x0_Newton, (observations[:-1], none_or_shift(predict_traj, -1), none_or_shift(update_traj, -1), none_or_shift(update_traj, 1)))
-
 
     F_x, Q, b, F_xx = linearization_method_hessian(transition_model, MVNStandard(predict_traj.mean[-1], predict_traj.cov[-1]))
     x = predict(F_x, Q, b, x)

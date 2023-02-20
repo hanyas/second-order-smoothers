@@ -2,7 +2,6 @@ from typing import Optional, Callable
 
 import jax
 import jax.scipy.linalg as jlag
-from jax.experimental.host_callback import id_print
 
 from parsmooth._base import MVNStandard, are_inputs_compatible, FunctionalModel
 from parsmooth._utils import none_or_shift, none_or_concat
@@ -20,7 +19,6 @@ def smoothing(transition_model: FunctionalModel,
     def smooth_one(F_x, cov_or_chol, b, xf, xs):
         are_inputs_compatible(xf, xs)
         return _standard_smooth(F_x, cov_or_chol, b, xf, xs)
-
 
     def body(smoothed, inputs):
         filtered, ref = inputs
@@ -46,10 +44,9 @@ def _standard_smooth(F, Q, b, xf, xs):
 
     mean_diff = ms - (b + F @ mf)
     S = F @ Pf @ F.T + Q
-
     cov_diff = Ps - S
 
-    gain = Pf @ jlag.solve(S, F, sym_pos=True).T
+    gain = Pf @ jlag.solve(S, F).T
     ms = mf + gain @ mean_diff
     Ps = Pf + gain @ cov_diff @ gain.T
 
