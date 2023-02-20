@@ -46,4 +46,5 @@ def _second_order_callable_common(f, x) -> Tuple[Any, Any, Any]:
 
 def _standard_second_order_callable(f, x, m_q, cov_q):
     res, F_x, F_xx = _second_order_callable_common(f, x)
-    return res - F_x @ x + m_q, F_x, F_xx, cov_q
+    return F_xx, F_x, cov_q,\
+        res - F_x @ x - 0.5 * jnp.dot(x, jnp.dot(F_xx, x)) + m_q
