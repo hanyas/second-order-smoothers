@@ -7,8 +7,8 @@ from parsmooth.methods import iterated_smoothing
 
 from parsmooth.linearization import extended, second_order
 
-from parsmooth.sequential._tr_newton import _iterated_recursive_newton_smoother
-from parsmooth.sequential._tr_newton import log_posterior
+from parsmooth.sequential._ls_newton import _iterated_recursive_newton_smoother
+from parsmooth.sequential._ls_newton import log_posterior
 
 import matplotlib.pyplot as plt
 
@@ -51,7 +51,7 @@ newton_smoothed = _iterated_recursive_newton_smoother(observations, initial_dist
                                                       transition_model, observation_model,
                                                       second_order, extended,
                                                       nominal_trajectory,
-                                                      lmbda=1e1, nu=2.0, n_iter=25)[0]
+                                                      n_iter=25)[0]
 
 newton_cost = log_posterior(newton_smoothed.mean, observations,
                             initial_dist, transition_model, observation_model)
