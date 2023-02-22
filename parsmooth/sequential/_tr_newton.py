@@ -108,11 +108,11 @@ def _iterated_recursive_newton_smoother(observations: jnp.ndarray, initial_dist:
         smoothed_trajectory = newton_smoothing(transition_model, filtered_trajectory,
                                                linearization_method, nominal_trajectory)
 
-        new_approximate_cost = second_order_log_posterior(smoothed_trajectory.mean, psdo_obs,
-                                                          psdo_initial, psdo_trans_mdl, psdo_obs_mdl)
+        new_approximate_cost = approx_log_posterior(smoothed_trajectory.mean, psdo_obs,
+                                                    psdo_initial, psdo_trans_mdl, psdo_obs_mdl)
 
-        last_approximate_cost = second_order_log_posterior(nominal_trajectory.mean, psdo_obs,
-                                                           psdo_initial, psdo_trans_mdl, psdo_obs_mdl)
+        last_approximate_cost = approx_log_posterior(nominal_trajectory.mean, psdo_obs,
+                                                     psdo_initial, psdo_trans_mdl, psdo_obs_mdl)
 
         new_cost = log_posterior(smoothed_trajectory.mean, observations,
                                  initial_dist, transition_model, observation_model)
@@ -397,15 +397,15 @@ def log_posterior(states, observations,
     _xn = jax.vmap(f)(xp)
     _yn = jax.vmap(h)(xn)
 
-    cost = jnp.sum(jax.vmap(mvn_loglikelihood, in_axes=[0, None])(xn - _xn, Q)
-                   + jax.vmap(mvn_loglikelihood, in_axes=[0, None])(yn - _yn, R))\
+    cost = jnp.sum(jax.vmap(mvn_loglikelihood, in_axes=(0, None))(xn - _xn, Q)
+                   + jax.vmap(mvn_loglikelihood, in_axes=(0, None))(yn - _yn, R))\
            + mvn_loglikelihood(states[0] - m0, P0)
 
     return - cost
 
 
-def second_order_log_posterior(states, observations,
-                               initial_dist, transition_model, observation_model):
+def approx_log_posterior(states, observations,
+                         initial_dist, transition_model, observation_model):
 
     xp, xn = states[:-1], states[1:]
     yn = observations
