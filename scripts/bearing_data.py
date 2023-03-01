@@ -163,6 +163,10 @@ def make_parameters(qc, qw, r, dt, s1, s2):
         The observation function
     transition_function: callable
         The transition function
+    transition_function_dx: callable
+        The derivative of transition function
+    observation_function_dx: callable
+        The derivative of observation function
     """
 
     Q = jnp.array([[qc * dt ** 3 / 3, 0, qc * dt ** 2 / 2, 0, 0],
