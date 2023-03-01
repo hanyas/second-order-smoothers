@@ -8,6 +8,7 @@ from parsmooth.methods import iterated_smoothing
 from parsmooth.linearization import extended, second_order
 
 from parsmooth.sequential._ls_newton import _iterated_recursive_newton_smoother
+from parsmooth.sequential._ls_gn import _iterated_recursive_gauss_newton_smoother
 from parsmooth.sequential._ls_newton import log_posterior
 
 import matplotlib.pyplot as plt
@@ -56,6 +57,13 @@ newton_smoothed = _iterated_recursive_newton_smoother(observations, initial_dist
 newton_cost = log_posterior(newton_smoothed.mean, observations,
                             initial_dist, transition_model, observation_model)
 
+# Newton Recursive Iterated Smoother
+gauss_newton_ls_smoothed = _iterated_recursive_gauss_newton_smoother(observations, initial_dist,
+                                                            transition_model, observation_model
+                                                            ,extended,nominal_trajectory,
+                                                            n_iter=25)[0]
+
+
 # Gauss-Newton Recursive Iterated Smoother
 gauss_smoothed = iterated_smoothing(observations,
                                     initial_dist, transition_model, observation_model,
@@ -66,9 +74,17 @@ gauss_cost = log_posterior(gauss_smoothed.mean, observations,
                            initial_dist, transition_model, observation_model)
 
 
+# plt.figure(figsize=(15, 7))
+# plt.subplot(1, 2, 1)
+# plt.plot(gauss_smoothed.mean[:, 0], gauss_smoothed.mean[:, 1], "-*", label="Iterated Recursive Gauss-Newton Smoother")
+# plt.plot(true_states[:, 0], true_states[:, 1], "*", label="True")
+# plt.title("Gauss-Newton")
+# plt.grid()
+# plt.legend()
+
 plt.figure(figsize=(15, 7))
 plt.subplot(1, 2, 1)
-plt.plot(gauss_smoothed.mean[:, 0], gauss_smoothed.mean[:, 1], "-*", label="Iterated Recursive Gauss-Newton Smoother")
+plt.plot(gauss_newton_ls_smoothed.mean[:, 0], gauss_newton_ls_smoothed.mean[:, 1], "-*", label="Iterated Recursive Gauss-Newton line search Smoother")
 plt.plot(true_states[:, 0], true_states[:, 1], "*", label="True")
 plt.title("Gauss-Newton")
 plt.grid()
