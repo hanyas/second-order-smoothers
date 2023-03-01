@@ -1,14 +1,14 @@
 import jax
 import jax.numpy as jnp
 
-from parsmooth import MVNStandard
-from parsmooth import FunctionalModel
-from parsmooth.methods import iterated_smoothing
+from smoothopt import MVNStandard
+from smoothopt import FunctionalModel
+from smoothopt.methods import iterated_smoothing
 
-from parsmooth.linearization import extended, second_order
+from smoothopt.linearization import extended, second_order
 
-from parsmooth.sequential._ls_newton import _iterated_recursive_newton_smoother
-from parsmooth.sequential._ls_newton import log_posterior
+from smoothopt.sequential._ls_newton import _iterated_recursive_newton_smoother
+from smoothopt.sequential._ls_newton import log_posterior
 
 import matplotlib.pyplot as plt
 
@@ -31,7 +31,7 @@ qw = 0.1  # discretization noise
 T = 500  # number of observations
 nx, ny = 5, 2
 
-_, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
+_, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=11)
 
 Q, R, transition_function, observation_function, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
 

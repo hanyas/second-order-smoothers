@@ -1,14 +1,14 @@
 import jax
 import jax.numpy as jnp
 
-from parsmooth import MVNStandard
-from parsmooth import FunctionalModel
-from parsmooth.methods import iterated_smoothing
+from smoothopt import MVNStandard
+from smoothopt import FunctionalModel
+from smoothopt.methods import iterated_smoothing
 
-from parsmooth.linearization import extended
+from smoothopt.linearization import extended
 
-from parsmooth.sequential._bfgs import _iterated_batch_bfgs_smoother
-from parsmooth.sequential._bfgs import log_posterior
+from smoothopt.sequential._bfgs import _iterated_batch_bfgs_smoother
+from smoothopt.sequential._bfgs import log_posterior
 
 import matplotlib.pyplot as plt
 
@@ -31,7 +31,7 @@ qw = 0.1  # discretization noise
 T = 500  # number of observations
 nx, ny = 5, 2
 
-_, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=17)
+_, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
 
 Q, R, transition_function, observation_function, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
 
@@ -49,8 +49,8 @@ nominal_trajectory.cov.at[0].set(initial_dist.cov)
 # BFGS Batch Iterated Smoother
 bfgs_smoothed = _iterated_batch_bfgs_smoother(observations, initial_dist,
                                               transition_model, observation_model,
-                                              nominal_trajectory.mean,
-                                              n_iter=100)[0]
+                                              extended, nominal_trajectory.mean,
+                                              n_iter=25)[0]
 
 bfgs_cost = log_posterior(bfgs_smoothed, observations,
                           initial_dist, transition_model, observation_model)

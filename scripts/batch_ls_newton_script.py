@@ -1,14 +1,14 @@
 import jax
 import jax.numpy as jnp
 
-from parsmooth import MVNStandard
-from parsmooth import FunctionalModel
-from parsmooth.methods import iterated_smoothing
+from smoothopt import MVNStandard
+from smoothopt import FunctionalModel
+from smoothopt.methods import iterated_smoothing
 
-from parsmooth.linearization import extended, second_order
+from smoothopt.linearization import extended, second_order
 
-from parsmooth.sequential._ls_newton import _iterated_batch_newton_smoother
-from parsmooth.sequential._ls_newton import log_posterior
+from smoothopt.sequential._ls_newton import _iterated_batch_newton_smoother
+from smoothopt.sequential._ls_newton import log_posterior
 
 import matplotlib.pyplot as plt
 
