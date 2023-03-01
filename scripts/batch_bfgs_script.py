@@ -1,14 +1,14 @@
 import jax
 import jax.numpy as jnp
 
-from smoothopt import MVNStandard
-from smoothopt import FunctionalModel
-from smoothopt.methods import iterated_smoothing
+from optsmooth import MVNStandard
+from optsmooth import FunctionalModel
+from optsmooth.methods import iterated_smoothing
 
-from smoothopt.linearization import extended
+from optsmooth.linearization import extended
 
-from smoothopt.sequential._bfgs import _iterated_batch_bfgs_smoother
-from smoothopt.sequential._bfgs import log_posterior
+from optsmooth.sequential._bfgs import _iterated_batch_bfgs_smoother
+from optsmooth.sequential._bfgs import log_posterior
 
 import matplotlib.pyplot as plt
 

@@ -3,8 +3,8 @@ from typing import Tuple, Union, Optional
 import jax.numpy as jnp
 import numpy as np
 
-from smoothopt._base import MVNStandard, FunctionalModel, ConditionalMomentsModel, MVNSqrt
-from smoothopt.linearization._sigma_points import SigmaPoints, linearize_functional, linearize_conditional
+from optsmooth._base import MVNStandard, FunctionalModel, ConditionalMomentsModel, MVNSqrt
+from optsmooth.linearization._sigma_points import SigmaPoints, linearize_functional, linearize_conditional
 
 
 def linearize(model: Union[FunctionalModel, ConditionalMomentsModel],

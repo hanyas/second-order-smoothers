@@ -5,9 +5,9 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.linalg import cho_solve
 
-from smoothopt._base import MVNSqrt, are_inputs_compatible
-from smoothopt._utils import cholesky_update_many, tria
-from smoothopt.linearization._common import get_mvnsqrt
+from optsmooth._base import MVNSqrt, are_inputs_compatible
+from optsmooth._utils import cholesky_update_many, tria
+from optsmooth.linearization._common import get_mvnsqrt
 
 
 class SigmaPoints(NamedTuple):

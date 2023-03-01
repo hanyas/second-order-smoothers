@@ -7,8 +7,8 @@ from jax.flatten_util import ravel_pytree
 
 from jaxopt import BacktrackingLineSearch
 
-from smoothopt._base import MVNStandard, FunctionalModel
-from smoothopt._base import LinearTransition, LinearObservation
+from optsmooth._base import MVNStandard, FunctionalModel
+from optsmooth._base import LinearTransition, LinearObservation
 
 
 logdet = lambda x: jnp.linalg.slogdet(x)[1]

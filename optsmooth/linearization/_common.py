@@ -2,8 +2,8 @@ from typing import Union
 
 from jax import numpy as jnp
 
-from smoothopt._base import MVNStandard, MVNSqrt, FunctionalModel, ConditionalMomentsModel
-from smoothopt._utils import tria
+from optsmooth._base import MVNStandard, MVNSqrt, FunctionalModel, ConditionalMomentsModel
+from optsmooth._utils import tria
 
 
 def get_mvnsqrt(x: Union[MVNSqrt, MVNStandard]):

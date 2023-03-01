@@ -2,13 +2,13 @@ from typing import Callable, Optional, Union
 
 from jax import numpy as jnp
 
-from smoothopt._base import MVNStandard, FunctionalModel, MVNSqrt, ConditionalMomentsModel
-from smoothopt._pathwise_sampler import _par_sampling, _seq_sampling
-from smoothopt._utils import fixed_point
-from smoothopt.parallel._filtering import filtering as par_filtering
-from smoothopt.parallel._smoothing import smoothing as par_smoothing
-from smoothopt.sequential._filtering import filtering as seq_filtering
-from smoothopt.sequential._smoothing import smoothing as seq_smoothing
+from optsmooth._base import MVNStandard, FunctionalModel, MVNSqrt, ConditionalMomentsModel
+from optsmooth._pathwise_sampler import _par_sampling, _seq_sampling
+from optsmooth._utils import fixed_point
+from optsmooth.parallel._filtering import filtering as par_filtering
+from optsmooth.parallel._smoothing import smoothing as par_smoothing
+from optsmooth.sequential._filtering import filtering as seq_filtering
+from optsmooth.sequential._smoothing import smoothing as seq_smoothing
 
 
 def filtering(observations: jnp.ndarray,

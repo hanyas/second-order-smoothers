@@ -5,8 +5,8 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.linalg as jlag
 
-from smoothopt._base import MVNStandard, MVNSqrt, FunctionalModel
-from smoothopt._utils import tria, none_or_shift, none_or_concat
+from optsmooth._base import MVNStandard, MVNSqrt, FunctionalModel
+from optsmooth._utils import tria, none_or_shift, none_or_concat
 
 
 def _par_sampling(key: jnp.ndarray,

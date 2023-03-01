@@ -3,10 +3,10 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 from jax.scipy.linalg import solve
-from smoothopt._base import MVNStandard, FunctionalModel
-from smoothopt._base import LinearTransition, LinearObservation
-from smoothopt._utils import none_or_shift, none_or_concat
-from smoothopt.sequential._smoothing import smoothing as gauss_newton_smoothing
+from optsmooth._base import MVNStandard, FunctionalModel
+from optsmooth._base import LinearTransition, LinearObservation
+from optsmooth._utils import none_or_shift, none_or_concat
+from optsmooth.sequential._smoothing import smoothing as gauss_newton_smoothing
 
 
 logdet = lambda x: jnp.linalg.slogdet(x)[1]

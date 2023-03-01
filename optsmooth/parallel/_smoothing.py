@@ -4,9 +4,9 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.linalg as jlinalg
 
-from smoothopt._base import MVNStandard, FunctionalModel, MVNSqrt, are_inputs_compatible, ConditionalMomentsModel
-from smoothopt._utils import none_or_concat, tria
-from smoothopt.parallel._operators import sqrt_smoothing_operator, \
+from optsmooth._base import MVNStandard, FunctionalModel, MVNSqrt, are_inputs_compatible, ConditionalMomentsModel
+from optsmooth._utils import none_or_concat, tria
+from optsmooth.parallel._operators import sqrt_smoothing_operator, \
     standard_smoothing_operator
 
 

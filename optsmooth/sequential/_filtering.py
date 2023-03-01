@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.linalg import cho_solve, solve_triangular
 
-from smoothopt._base import MVNStandard, FunctionalModel, MVNSqrt, are_inputs_compatible, ConditionalMomentsModel
-from smoothopt._utils import tria, none_or_shift, none_or_concat, mvn_loglikelihood
+from optsmooth._base import MVNStandard, FunctionalModel, MVNSqrt, are_inputs_compatible, ConditionalMomentsModel
+from optsmooth._utils import tria, none_or_shift, none_or_concat, mvn_loglikelihood
 
 
 def filtering(observations: jnp.ndarray,

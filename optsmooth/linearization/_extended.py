@@ -3,7 +3,7 @@ from typing import Any, Tuple, Union, Callable
 import jax
 import jax.numpy as jnp
 
-from smoothopt._base import FunctionalModel, ConditionalMomentsModel, MVNSqrt, are_inputs_compatible, MVNStandard
+from optsmooth._base import FunctionalModel, ConditionalMomentsModel, MVNSqrt, are_inputs_compatible, MVNStandard
 
 
 def linearize(model: Union[FunctionalModel, ConditionalMomentsModel, Callable],

@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import jax.scipy.linalg as jlinalg
 
-from smoothopt._utils import tria
+from optsmooth._utils import tria
 
 
 def standard_filtering_operator(elem1, elem2):

@@ -6,10 +6,12 @@ import jax.scipy as jsc
 from jax.scipy.linalg import solve, cho_solve
 from jax.flatten_util import ravel_pytree
 
-from smoothopt._base import MVNStandard, FunctionalModel
-from smoothopt._base import LinearTransition, LinearObservation
-from smoothopt._utils import none_or_shift, none_or_concat
-from smoothopt.sequential._smoothing import smoothing as newton_smoothing
+from jaxopt import BacktrackingLineSearch
+
+from optsmooth._base import MVNStandard, FunctionalModel
+from optsmooth._base import LinearTransition, LinearObservation
+from optsmooth._utils import none_or_shift, none_or_concat
+from optsmooth.sequential._smoothing import smoothing as newton_smoothing
 
 
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
@@ -18,7 +20,7 @@ logdet = lambda x: jnp.linalg.slogdet(x)[1]
 def _iterated_batch_newton_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
                                     transition_model: FunctionalModel, observation_model: FunctionalModel,
                                     quadratization_method: Callable, nominal_mean: jnp.ndarray,
-                                    lmbda: float = 1e2, nu: float = 2.0, n_iter: int = 10):
+                                    n_iter: int = 10):
 
     flat_nominal_mean, unravel = ravel_pytree(nominal_mean)
 
@@ -29,8 +31,11 @@ def _iterated_batch_newton_smoother(observations: jnp.ndarray, initial_dist: MVN
 
     init_cost = _flattend_log_posterior(flat_nominal_mean)
 
+    ls = BacktrackingLineSearch(fun=_flattend_log_posterior,
+                                maxiter=100, condition="strong-wolfe")
+
     def body(carry, _):
-        nominal_mean, last_cost, lmbda, nu = carry
+        nominal_mean, last_cost = carry
 
         jac = jax.jacobian(_flattend_log_posterior)(nominal_mean)
         hess = jax.hessian(_flattend_log_posterior)(nominal_mean)
@@ -42,41 +47,52 @@ def _iterated_batch_newton_smoother(observations: jnp.ndarray, initial_dist: MVN
         #                          quadratization_method,
         #                          unravel(nominal_mean))
 
-        hess_reg = hess + lmbda * jnp.eye(hess.shape[0])
-        search_dir = - jnp.linalg.solve(hess_reg, jac)
-        smoothed_mean = nominal_mean + search_dir
+        def _modify_hessian_cond(carry):
+            hess, jac, search_dir, lmbda = carry
+            hess_reg = hess + lmbda * jnp.eye(hess.shape[0])
+            approx_cost_diff = - jnp.dot(search_dir, jac) \
+                               - 0.5 * jnp.dot(jnp.dot(search_dir, hess_reg), search_dir)
+            return approx_cost_diff <= 0.0
+
+        def _modify_hessian_body(carry):
+            hess, jac, _, lmbda = carry
+            lmbda = lmbda * 10.0
+            hess_reg = hess + lmbda * jnp.eye(hess.shape[0])
+            search_dir = - jnp.linalg.solve(hess_reg, jac)
+            return hess, jac, search_dir, lmbda
+
+        def _modify_hessian(args):
+            hess, jac, search_dir = args
+            _, _, search_dir, lmbda = jax.lax.while_loop(_modify_hessian_cond,
+                                                         _modify_hessian_body,
+                                                         (hess, jac, search_dir, 1e-8))
+            return search_dir, lmbda
+
+        def _keep_hessian(args):
+            hess, jac, search_dir = args
+            return search_dir, 0.0
+
+        search_dir = - jnp.linalg.solve(hess, jac)
+        approx_cost_diff = - jnp.dot(search_dir, jac) \
+                           - 0.5 * jnp.dot(jnp.dot(search_dir, hess), search_dir)
+
+        # modify Hessian if necessary
+        search_dir, _ = jax.lax.cond(approx_cost_diff > 0.0,
+                                     _keep_hessian, _modify_hessian,
+                                     (hess, jac, search_dir))
+
+        # line search optimal step size
+        alpha, state = ls.run(init_stepsize=1.0, params=nominal_mean,
+                              descent_direction=search_dir)
+
+        # update smoothed mean
+        smoothed_mean = nominal_mean + alpha * search_dir
 
         new_cost = _flattend_log_posterior(smoothed_mean)
+        return (smoothed_mean, new_cost), new_cost
 
-        true_cost_diff = last_cost - new_cost
-        approx_cost_diff = - jnp.dot(search_dir, jac)\
-                           - 0.5 * jnp.dot(jnp.dot(search_dir, hess_reg), search_dir)
-
-        ratio = true_cost_diff / approx_cost_diff
-
-        def _accept_step(args):
-            _, smoothed_mean, _, new_cost, lmbda, nu, ratio = args
-            lmbda = lmbda * jnp.maximum(1. / 3., 1. - (2. * ratio - 1) ** 3)
-            lmbda = jnp.maximum(1e-16, lmbda)
-            return smoothed_mean, new_cost, lmbda, 2.0
-
-        def _reject_step(args):
-            nominal_mean, _, last_cost, _, lmbda, nu, _ = args
-            lmbda = jnp.minimum(1e16, lmbda)
-            return nominal_mean, last_cost, lmbda * nu, 2.0 * nu
-
-        nominal_mean, last_cost, lmbda, nu = jax.lax.cond((ratio > 0.0) & (approx_cost_diff > 0.0),
-                                                          _accept_step, _reject_step,
-                                                          operand=(nominal_mean,
-                                                                   smoothed_mean,
-                                                                   last_cost, new_cost,
-                                                                   lmbda, nu, ratio))
-
-        return (nominal_mean, last_cost, lmbda, nu), last_cost
-
-    (flat_nominal_mean, _, lmbda, _), costs = jax.lax.scan(body, (flat_nominal_mean,
-                                                                  init_cost, lmbda, nu),
-                                                           jnp.arange(n_iter))
+    (flat_nominal_mean, _), costs = jax.lax.scan(body, (flat_nominal_mean, init_cost),
+                                                 jnp.arange(n_iter))
 
     nominal_mean = unravel(flat_nominal_mean)
     return nominal_mean, jnp.hstack((init_cost, costs))
@@ -86,14 +102,12 @@ def _iterated_recursive_newton_smoother(observations: jnp.ndarray, initial_dist:
                                         transition_model: FunctionalModel, observation_model: FunctionalModel,
                                         quadratization_method: Callable, linearization_method: Callable,
                                         nominal_trajectory: MVNStandard,
-                                        lmbda: float = 1e2, nu: float = 2.0, n_iter: int = 10):
+                                        n_iter: int = 10):
 
     init_cost = log_posterior(nominal_trajectory.mean, observations,
                               initial_dist, transition_model, observation_model)
 
-    def body(carry, _):
-        nominal_trajectory, last_cost, lmbda, nu = carry
-
+    def _newton_update(nominal_trajectory, lmbda):
         psdo_obs, psdo_initial, \
             psdo_trans_mdl, psdo_obs_mdl = newton_state_space(observations,
                                                               initial_dist,
@@ -103,7 +117,9 @@ def _iterated_recursive_newton_smoother(observations: jnp.ndarray, initial_dist:
                                                               nominal_trajectory,
                                                               lmbda)
 
-        filtered_trajectory = newton_filtering(psdo_obs, psdo_initial, psdo_trans_mdl, psdo_obs_mdl)
+        filtered_trajectory = newton_filtering(psdo_obs,
+                                               psdo_initial,
+                                               psdo_trans_mdl, psdo_obs_mdl)
 
         smoothed_trajectory = newton_smoothing(transition_model, filtered_trajectory,
                                                linearization_method, nominal_trajectory)
@@ -114,36 +130,69 @@ def _iterated_recursive_newton_smoother(observations: jnp.ndarray, initial_dist:
         last_approximate_cost = approx_log_posterior(nominal_trajectory.mean, psdo_obs,
                                                      psdo_initial, psdo_trans_mdl, psdo_obs_mdl)
 
+        approx_cost_diff = last_approximate_cost - new_approximate_cost
+        return smoothed_trajectory, approx_cost_diff
+
+    def body(carry, _):
+        nominal_trajectory, last_cost = carry
+
+        def _modify_hessian_cond(carry):
+            lmbda = carry
+            smoothed_trajectory, approx_cost_diff = _newton_update(nominal_trajectory, lmbda)
+            return approx_cost_diff <= 0.0
+
+        def _modify_hessian_body(carry):
+            lmbda = carry
+            return lmbda * 10.0
+
+        def _modify_hessian(args):
+            _ = args
+            lmbda = jax.lax.while_loop(_modify_hessian_cond,
+                                       _modify_hessian_body, 1e-8)
+            smoothed_trajectory, _ = _newton_update(nominal_trajectory, lmbda)
+            return smoothed_trajectory, lmbda
+
+        def _keep_hessian(args):
+            smoothed_trajectory = args
+            return smoothed_trajectory, 0.0
+
+        smoothed_trajectory, approx_cost_diff = _newton_update(nominal_trajectory, 1e-16)
+
+        # regularize model if necessary
+        smoothed_trajectory, _ = jax.lax.cond(approx_cost_diff > 0.0,
+                                              _keep_hessian, _modify_hessian,
+                                              smoothed_trajectory)
+
+        # line search
+        def cond(carry):
+            _, backtrack, new_cost = carry
+            return jnp.logical_and((new_cost > last_cost), (backtrack < 50))
+
+        def body(carry):
+            alpha, backtrack, _ = carry
+            alpha = 0.5 * alpha
+            backtrack = backtrack + 1
+            interpolated_mean = nominal_trajectory.mean\
+                                + alpha * (smoothed_trajectory.mean - nominal_trajectory.mean)
+            new_cost = log_posterior(interpolated_mean, observations,
+                                     initial_dist, transition_model, observation_model)
+            return alpha, backtrack, new_cost
+
+        alpha, backtrack = 1.0, 0
         new_cost = log_posterior(smoothed_trajectory.mean, observations,
                                  initial_dist, transition_model, observation_model)
+        alpha, _, new_cost = jax.lax.while_loop(cond, body, (alpha, backtrack, new_cost))
 
-        true_cost_diff = last_cost - new_cost
-        approx_cost_diff = last_approximate_cost - new_approximate_cost
-        ratio = true_cost_diff / approx_cost_diff
+        # update smoothed trajectory
+        interpolated_mean = nominal_trajectory.mean \
+                            + alpha * (smoothed_trajectory.mean - nominal_trajectory.mean)
 
-        def _accept_step(args):
-            _, smoothed_trajectory, _, new_cost, lmbda, nu, ratio = args
-            lmbda = lmbda * jnp.maximum(1. / 3., 1. - (2. * ratio - 1) ** 3)
-            lmbda = jnp.maximum(1e-16, lmbda)
-            return smoothed_trajectory, new_cost, lmbda, 2.0
+        smoothed_trajectory = MVNStandard(interpolated_mean, smoothed_trajectory.cov)
+        return (smoothed_trajectory, new_cost), new_cost
 
-        def _reject_step(args):
-            nominal_trajectory, _, last_cost, _, lmbda, nu, _ = args
-            lmbda = jnp.minimum(1e16, lmbda)
-            return nominal_trajectory, last_cost, lmbda * nu, 2.0 * nu
-
-        nominal_trajectory, last_cost, lmbda, nu = jax.lax.cond((ratio > 0.0) & (approx_cost_diff > 0.0),
-                                                                _accept_step, _reject_step,
-                                                                operand=(nominal_trajectory,
-                                                                         smoothed_trajectory,
-                                                                         last_cost, new_cost,
-                                                                         lmbda, nu, ratio))
-
-        return (nominal_trajectory, last_cost, lmbda, nu), last_cost
-
-    (nominal_trajectory, _, lmbda, _), costs = jax.lax.scan(body,
-                                                            (nominal_trajectory, init_cost, lmbda, nu),
-                                                            jnp.arange(n_iter))
+    (nominal_trajectory, _), costs = jax.lax.scan(body,
+                                                  (nominal_trajectory, init_cost),
+                                                  jnp.arange(n_iter))
 
     return nominal_trajectory, jnp.hstack((init_cost, costs))
 

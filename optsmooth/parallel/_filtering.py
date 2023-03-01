@@ -4,9 +4,9 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.linalg as jlinalg
 
-from smoothopt._base import MVNStandard, FunctionalModel, MVNSqrt, are_inputs_compatible, ConditionalMomentsModel
-from smoothopt._utils import tria, none_or_concat, mvn_loglikelihood
-from smoothopt.parallel._operators import sqrt_filtering_operator, standard_filtering_operator
+from optsmooth._base import MVNStandard, FunctionalModel, MVNSqrt, are_inputs_compatible, ConditionalMomentsModel
+from optsmooth._utils import tria, none_or_concat, mvn_loglikelihood
+from optsmooth.parallel._operators import sqrt_filtering_operator, standard_filtering_operator
 
 
 def filtering(observations: jnp.ndarray,

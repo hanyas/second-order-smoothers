@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.linalg as jlag
 
-from smoothopt._base import MVNStandard, MVNSqrt, are_inputs_compatible, FunctionalModel, ConditionalMomentsModel
-from smoothopt._utils import tria, none_or_shift, none_or_concat
+from optsmooth._base import MVNStandard, MVNSqrt, are_inputs_compatible, FunctionalModel, ConditionalMomentsModel
+from optsmooth._utils import tria, none_or_shift, none_or_concat
 
 
 def smoothing(transition_model: Union[FunctionalModel, ConditionalMomentsModel],
