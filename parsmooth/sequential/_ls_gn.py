@@ -15,7 +15,7 @@ logdet = lambda x: jnp.linalg.slogdet(x)[1]
 def _iterated_recursive_gauss_newton_smoother(observations: jnp.ndarray, initial_dist: MVNStandard,
                                               transition_model: FunctionalModel, observation_model: FunctionalModel,
                                               linearization_method: Callable, nominal_trajectory: MVNStandard,
-                                              n_iter: int = 10):
+                                              n_iter):
 
     init_cost = log_posterior(nominal_trajectory.mean, observations,
                               initial_dist, transition_model, observation_model)

@@ -57,11 +57,11 @@ newton_smoothed = _iterated_recursive_newton_smoother(observations, initial_dist
 newton_cost = log_posterior(newton_smoothed.mean, observations,
                             initial_dist, transition_model, observation_model)
 
-# Newton Recursive Iterated Smoother
+# Gauss-Newton Recursive Iterated Smoother
 gauss_newton_ls_smoothed = _iterated_recursive_gauss_newton_smoother(observations, initial_dist,
-                                                            transition_model, observation_model
-                                                            ,extended,nominal_trajectory,
-                                                            n_iter=25)[0]
+                                                                     transition_model, observation_model
+                                                                     ,extended,nominal_trajectory,
+                                                                     n_iter=25)[0]
 
 
 # Gauss-Newton Recursive Iterated Smoother
