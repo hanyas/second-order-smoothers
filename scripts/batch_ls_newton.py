@@ -27,7 +27,6 @@ qw = 0.1  # discretization noise
 T = 500  # number of observations
 nx, ny = 5, 2
 
-
 _, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
 Q, R, trns_fcn, obs_fcn, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
 

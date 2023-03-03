@@ -12,7 +12,7 @@ from bearing_data import get_data, make_parameters
 
 jax.config.update('jax_platform_name', 'cpu')
 jax.config.update("jax_enable_x64", True)
-jax.config.update('jax_disable_jit', True)
+# jax.config.update('jax_disable_jit', True)
 
 
 s1 = jnp.array([-1.5, 0.5])  # First sensor location
@@ -24,7 +24,7 @@ dt = 0.01  # discretization time step
 qc = 0.01  # discretization noise
 qw = 0.1  # discretization noise
 
-T = 50  # number of observations
+T = 500  # number of observations
 nx, ny = 5, 2
 
 _, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
