@@ -39,12 +39,12 @@ init_dist = MVNStandard(
     mean=jnp.array([-1.0, -1.0, 0.0, 0.0, 0.0]), cov=jnp.eye(nx)
 )
 
-nominal_trajectory = MVNStandard(
+nominal_traj = MVNStandard(
     mean=jnp.zeros((T + 1, nx)),
     cov=jnp.repeat(jnp.eye(nx).reshape(1, nx, nx), T + 1, axis=0),
 )
-nominal_trajectory.mean.at[0].set(init_dist.mean)
-nominal_trajectory.cov.at[0].set(init_dist.cov)
+nominal_traj.mean.at[0].set(init_dist.mean)
+nominal_traj.cov.at[0].set(init_dist.cov)
 
 smoothed_traj, costs = line_search_iterated_recursive_newton_smoother(
     observations,
@@ -53,7 +53,7 @@ smoothed_traj, costs = line_search_iterated_recursive_newton_smoother(
     obs_mdl,
     extended,
     second_order,
-    nominal_trajectory,
+    nominal_traj,
     nb_iter=25,
 )
 

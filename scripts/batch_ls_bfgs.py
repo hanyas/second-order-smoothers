@@ -47,7 +47,7 @@ smoothed_traj, costs = line_search_iterated_batch_bfgs_smoother(observations, in
 plt.figure(figsize=(7, 7))
 plt.plot(smoothed_traj[:, 0], smoothed_traj[:, 1], "-*", label="Iterated Batch BFGS Smoother")
 plt.plot(true_states[:, 0], true_states[:, 1], "*", label="True")
-plt.title("Newton")
+plt.title("BFGS")
 plt.grid()
 plt.legend()
 plt.show()
