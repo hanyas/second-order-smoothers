@@ -28,7 +28,7 @@ def second_order(model: Union[FunctionalModel, Callable],
     F_xx: jnp.ndarray
         The hessian
     cov_q: jnp.ndarray
-        Either the cholesky or the full-rank modified covariance matrix
+        The covariance matrix
     """
     if isinstance(model, FunctionalModel):
         f, q = model
@@ -46,4 +46,4 @@ def _second_order_callable_common(f, x) -> Tuple[Any, Any, Any]:
 
 def _standard_second_order_callable(f, x, m_q, cov_q):
     res, F_x, F_xx = _second_order_callable_common(f, x)
-    return F_xx, F_x, cov_q, res - F_x @ x + m_q
+    return F_xx, F_x, res - F_x @ x + m_q, cov_q

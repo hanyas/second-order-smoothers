@@ -1,37 +1,43 @@
 import itertools
-from typing import NamedTuple, Callable, Any, Union
+from typing import NamedTuple, Callable
+
+import jax.numpy as jnp
 
 
 class MVNStandard(NamedTuple):
-    mean: Any
-    cov: Any
-
-
-class MVNSqrt(NamedTuple):
-    mean: Any
-    chol: Any
+    mean: jnp.ndarray
+    cov: jnp.ndarray
 
 
 class LinearTransition(NamedTuple):
-    F_x: Any
-    f0: Any
-    Q: Any
+    F_x: jnp.ndarray
+    b: jnp.ndarray
+    Q: jnp.ndarray
 
 
 class LinearObservation(NamedTuple):
-    H_x: Any
-    h0: Any
-    R: Any
+    H_x: jnp.ndarray
+    c: jnp.ndarray
+    R: jnp.ndarray
+
+
+class QuadraticTransition(NamedTuple):
+    F_xx: jnp.ndarray
+    F_x: jnp.ndarray
+    b: jnp.ndarray
+    Q: jnp.ndarray
+
+
+class QuadraticObservation(NamedTuple):
+    H_xx: jnp.ndarray
+    H_x: jnp.ndarray
+    c: jnp.ndarray
+    R: jnp.ndarray
 
 
 class FunctionalModel(NamedTuple):
     function: Callable
-    mvn: Union[MVNSqrt, MVNStandard]
-
-
-class ConditionalMomentsModel(NamedTuple):
-    conditional_mean: Callable
-    conditional_covariance_or_cholesky: Callable
+    mvn: MVNStandard
 
 
 def are_inputs_compatible(*y):
