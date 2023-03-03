@@ -10,13 +10,13 @@ class MVNStandard(NamedTuple):
 
 
 class LinearTransition(NamedTuple):
-    F_x: jnp.ndarray
+    F: jnp.ndarray
     b: jnp.ndarray
     Q: jnp.ndarray
 
 
 class LinearObservation(NamedTuple):
-    H_x: jnp.ndarray
+    H: jnp.ndarray
     c: jnp.ndarray
     R: jnp.ndarray
 

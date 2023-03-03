@@ -14,7 +14,6 @@ jax.config.update('jax_platform_name', 'cpu')
 jax.config.update("jax_enable_x64", True)
 # jax.config.update('jax_disable_jit', True)
 
-
 s1 = jnp.array([-1.5, 0.5])  # First sensor location
 s2 = jnp.array([1., 1.])  # Second sensor location
 r = 0.5  # Observation noise (stddev)

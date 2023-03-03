@@ -237,8 +237,8 @@ def _build_newton_state_space(
     m0, P0 = initial_dist
     y = observations
 
-    F_x, b, Q = transition_model
-    H_x, c, R = observation_model
+    F, b, Q = transition_model
+    H, c, R = observation_model
 
     Phi = transition_hess
     Gamma = observation_hess
@@ -253,22 +253,22 @@ def _build_newton_state_space(
     L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + Phi[0] + lmbda * jnp.eye(nx))
 
     # intermediate time steps
-    def _build_observation_model(H_x, c, R, Phi, Gamma):
-        G_x = jnp.vstack((H_x, jnp.eye(nx)))
+    def _build_observation_model(H, c, R, Phi, Gamma):
+        G = jnp.vstack((H, jnp.eye(nx)))
         q = jnp.hstack((c, jnp.zeros((nx,))))
         W = block_diag(R, inv(Phi + Gamma + lmbda * jnp.eye(nx)))
-        return G_x, q, W
+        return G, q, W
 
-    G_x, q, W = jax.vmap(_build_observation_model)(
-        H_x[:-1], c[:-1], R[:-1], Phi[1:], Gamma[:-1]
+    G, q, W = jax.vmap(_build_observation_model)(
+        H[:-1], c[:-1], R[:-1], Phi[1:], Gamma[:-1]
     )
 
     # final time step
-    _G_x = jnp.vstack((H_x[-1], jnp.eye(nx)))
+    _G = jnp.vstack((H[-1], jnp.eye(nx)))
     _q = jnp.hstack((c[-1], jnp.zeros((nx,))))
     _W = block_diag(R[-1], inv(Gamma[-1] + lmbda * jnp.eye(nx)))
 
-    G_x = jnp.stack((*G_x, _G_x))
+    G = jnp.stack((*G, _G))
     q = jnp.vstack((q, _q))
     W = jnp.stack((*W, _W))
 
@@ -279,8 +279,8 @@ def _build_newton_state_space(
     return (
         z,
         MVNStandard(l0, L0),
-        LinearTransition(F_x, b, Q),
-        LinearObservation(G_x, q, W),
+        LinearTransition(F, b, Q),
+        LinearObservation(G, q, W),
     )
 
 

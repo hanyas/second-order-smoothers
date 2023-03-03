@@ -13,13 +13,10 @@ from optsmooth._utils import mvn_logpdf
 
 
 def _gn_bfgs_hess_update(S, s, yd, yc):
-    # Implements a damped GN-BFGS, see Nocedal et al.
-    return (
-        S
-        + (jnp.outer(yc - S @ s, yd) + jnp.outer(yd, yc - S @ s))
-        / jnp.dot(yd, s)
-        - jnp.outer(yc - S @ s, s) @ jnp.outer(yd, yd) / jnp.dot(yd, s) ** 2
-    )
+    aux = (jnp.outer(yc - S @ s, yd) + jnp.outer(yd, yc - S @ s)) / jnp.dot(yd, s)\
+          - jnp.outer(yc - S @ s, s) @ jnp.outer(yd, yd) / jnp.dot(yd, s) ** 2
+    tau = jnp.minimum(1.0, jnp.abs(jnp.dot(s, yc)) / jnp.abs(jnp.dot(s, jnp.dot(S, s))))
+    return tau * S + aux
 
 
 def _gn_bfgs_step(
@@ -65,7 +62,6 @@ def _line_search_gn_bfgs_step(
     yc = jnp.dot(Jn.T @ W, rn) - jnp.dot(Jp.T @ W, rn)
 
     next_bfgs_hess = _gn_bfgs_hess_update(bfgs_hess, alpha * dx, yd, yc)
-
     return xn, Jn, rn, next_bfgs_hess, fn
 
 
