@@ -6,7 +6,7 @@ import jax.scipy as jsc
 from jax.scipy.linalg import solve, cho_solve
 from jax.flatten_util import ravel_pytree
 
-from jaxopt import BacktrackingLineSearch
+# from jaxopt import BacktrackingLineSearch
 
 from parsmooth._base import MVNStandard, FunctionalModel
 from parsmooth._base import LinearTransition, LinearObservation
@@ -30,9 +30,9 @@ def _iterated_batch_newton_smoother(observations: jnp.ndarray, initial_dist: MVN
                              transition_model, observation_model)
 
     init_cost = _flattend_log_posterior(flat_nominal_mean)
-
-    ls = BacktrackingLineSearch(fun=_flattend_log_posterior,
-                                maxiter=100, condition="strong-wolfe")
+    #
+    # ls = BacktrackingLineSearch(fun=_flattend_log_posterior,
+    #                             maxiter=100, condition="strong-wolfe")
 
     def body(carry, _):
         nominal_mean, last_cost = carry
@@ -82,8 +82,21 @@ def _iterated_batch_newton_smoother(observations: jnp.ndarray, initial_dist: MVN
                                      (hess, jac, search_dir))
 
         # line search optimal step size
-        alpha, state = ls.run(init_stepsize=1.0, params=nominal_mean,
-                              descent_direction=search_dir)
+        def cond(carry):
+            _, backtrack, new_cost = carry
+            return jnp.logical_and((new_cost > last_cost), (backtrack < 50))
+        def body(carry):
+            alpha, backtrack, _ = carry
+            alpha = 0.5 * alpha
+            backtrack = backtrack + 1
+            interpolated_mean = nominal_mean \
+                                + alpha * search_dir
+            new_cost = _flattend_log_posterior(interpolated_mean)
+            return alpha, backtrack, new_cost
+
+        alpha, backtrack = 1.0, 0
+        new_cost = _flattend_log_posterior(nominal_mean + alpha * search_dir)
+        alpha, _, new_cost = jax.lax.while_loop(cond, body, (alpha, backtrack, new_cost))
 
         # update smoothed mean
         smoothed_mean = nominal_mean + alpha * search_dir
