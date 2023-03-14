@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 from optsmooth import MVNStandard
 from optsmooth import FunctionalModel
-from optsmooth.linearization import second_order
-from optsmooth.batch._tr_newton import (
+
+from optsmooth.batch.tr_newton import (
     trust_region_iterated_batch_newton_smoother,
 )
 
@@ -30,10 +30,10 @@ T = 500  # number of observations
 nx, ny = 5, 2
 
 _, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
-Q, R, trns_fcn, obs_fcn, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
+Q, R, trnas_fcn, obsrv_fcn, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
 
-trns_mdl = FunctionalModel(trns_fcn, MVNStandard(jnp.zeros((nx,)), Q))
-obs_mdl = FunctionalModel(obs_fcn, MVNStandard(jnp.zeros((ny,)), R))
+trans_mdl = FunctionalModel(trnas_fcn, MVNStandard(jnp.zeros((nx,)), Q))
+obsrv_mdl = FunctionalModel(obsrv_fcn, MVNStandard(jnp.zeros((ny,)), R))
 
 init_dist = MVNStandard(
     mean=jnp.array([-1.0, -1.0, 0.0, 0.0, 0.0]), cov=jnp.eye(nx)
@@ -43,15 +43,14 @@ init_nominal_mean = jnp.zeros((T + 1, nx))
 init_nominal_mean.at[0].set(init_dist.mean)
 
 smoothed_traj, costs = trust_region_iterated_batch_newton_smoother(
+    init_nominal_mean,
     observations,
     init_dist,
-    trns_mdl,
-    obs_mdl,
-    second_order,
-    init_nominal_mean,
+    trans_mdl,
+    obsrv_mdl,
+    nb_iter=25,
     lmbda=1e1,
     nu=2.0,
-    nb_iter=25,
 )
 
 plt.figure(figsize=(7, 7))
