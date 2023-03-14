@@ -4,109 +4,54 @@ import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
-from jaxopt import BacktrackingLineSearch
-
-from optsmooth._base import MVNStandard, FunctionalModel
-from optsmooth._utils import mvn_logpdf
+from optsmooth.base import MVNStandard, FunctionalModel
+from optsmooth.batch.utils import log_posterior, line_search
 
 
-def _modify_direction(args):
-    grad, hess, _ = args
+def _newton_step(x: jnp.ndarray, fun: Callable):
+    grad = jax.grad(fun)(x)
+    hess = jax.hessian(fun)(x)
 
-    def cond(carry):
-        lmbda = carry
-
+    def _step(lmbda):
         d = hess.shape[0]
         hess_reg = hess + lmbda * jnp.eye(d)
         dx = -jnp.linalg.solve(hess_reg, grad)
         df = -jnp.dot(dx, grad) - 0.5 * jnp.dot(jnp.dot(dx, hess_reg), dx)
-        return df <= 0.0
+        return dx, df
 
-    def body(carry):
-        lmbda = carry
-        lmbda = lmbda * 10.0
-        return lmbda
+    def _modify_dir():
+        lmbda = jax.lax.while_loop(
+            lambda a: _step(a)[1] <= 0.0,
+            lambda a: a * 10,
+            1e-8,
+        )
+        dx, _ = _step(lmbda)
+        return dx
 
-    lmbda = jax.lax.while_loop(
-        cond,
-        body,
-        1e-8,
-    )
-
-    d = hess.shape[0]
-    hess_reg = hess + lmbda * jnp.eye(d)
-    dx = -jnp.linalg.solve(hess_reg, grad)
-    return dx
+    dx, df = _step(1e-32)
+    return jax.lax.cond(df > 0.0, lambda: dx, _modify_dir)
 
 
-def _keep_direction(args):
-    _, _, dx = args
-    return dx
+def _line_search_newton(x0: jnp.ndarray, fun: Callable, k: int):
+    def body(carry, _):
+        x = carry
+        dx = _newton_step(x, fun)
+        xn = line_search(x, dx, fun)
+        return xn, fun(xn)
 
-
-def _newton_step(fun: Callable, x0: jnp.ndarray):
-    grad = jax.grad(fun)(x0)
-    hess = jax.hessian(fun)(x0)
-
-    d = hess.shape[0]
-    dx = -jnp.linalg.solve(hess, grad)
-    df = -jnp.dot(dx, grad) - 0.5 * jnp.dot(jnp.dot(dx, hess), dx)
-
-    # modify direciton if necessary
-    dx = jax.lax.cond(
-        df > 0.0, _keep_direction, _modify_direction, (grad, hess, dx)
-    )
-    return dx
-
-
-def _line_search_newton_step(fun: Callable, x0: jnp.ndarray):
-    dx = _newton_step(fun, x0)
-
-    ls = BacktrackingLineSearch(fun=fun, maxiter=100)
-
-    alpha, _ = ls.run(
-        init_stepsize=1.0,
-        params=x0,
-        descent_direction=dx,
-    )
-    xn = x0 + alpha * dx
-    fn = fun(xn)
+    xn, fn = jax.lax.scan(body, x0, jnp.arange(k))
     return xn, fn
 
 
-def log_posterior(
-    states: jnp.ndarray,
-    observations: jnp.ndarray,
-    initial_dist: MVNStandard,
-    transition_model: FunctionalModel,
-    observation_model: FunctionalModel,
-):
-    xp, xn = states[:-1], states[1:]
-    yn = observations
-
-    m0, P0 = initial_dist
-    f, (_, Q) = transition_model
-    h, (_, R) = observation_model
-
-    xn_mu = jax.vmap(f)(xp)
-    yn_mu = jax.vmap(h)(xn)
-
-    cost = -mvn_logpdf(states[0], m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(yn, yn_mu, R))
-    return cost
-
-
 def line_search_iterated_batch_newton_smoother(
+    init_nominal_mean: jnp.ndarray,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
-    quadratization_method: Callable,
-    init_nominal_mean: jnp.ndarray,
     nb_iter: int = 10,
 ):
-    flat_nominal_mean, _unflatten = ravel_pytree(init_nominal_mean)
+    flat_init_nominal_mean, _unflatten = ravel_pytree(init_nominal_mean)
 
     def _flat_log_posterior(flat_state):
         _state = _unflatten(flat_state)
@@ -118,21 +63,15 @@ def line_search_iterated_batch_newton_smoother(
             observation_model,
         )
 
-    init_cost = _flat_log_posterior(flat_nominal_mean)
+    init_cost = _flat_log_posterior(flat_init_nominal_mean)
 
-    def body(carry, _):
-        flat_nominal_mean = carry
-        flat_nominal_mean, cost = _line_search_newton_step(
-            fun=_flat_log_posterior, x0=flat_nominal_mean
-        )
-        return flat_nominal_mean, cost
-
-    flat_nominal_mean, costs = jax.lax.scan(
-        body, flat_nominal_mean, jnp.arange(nb_iter)
+    flat_nominal_mean, costs = _line_search_newton(
+        x0=flat_init_nominal_mean,
+        fun=_flat_log_posterior,
+        k=nb_iter
     )
 
-    nominal_mean = _unflatten(flat_nominal_mean)
-    return nominal_mean, jnp.hstack((init_cost, costs))
+    return _unflatten(flat_nominal_mean), jnp.hstack((init_cost, costs))
 
 
 def _build_grad_and_hess(
@@ -152,18 +91,26 @@ def _build_grad_and_hess(
     m_curr = nominal_mean[:-1]
     m_next = nominal_mean[1:]
 
-    f0, F_x, F_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(f, m_curr)
-    h0, H_x, H_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(h, m_next)
+    f0, F_x, F_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(
+        f, m_curr
+    )
+    h0, H_x, H_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(
+        h, m_next
+    )
 
     T = nominal_mean.shape[0]
     nx = Q.shape[-1]
     ny = R.shape[-1]
 
     def _dynamics_hessian(F_xx, m_next, m_curr):
-        return -jnp.einsum("ijk,k->ij", F_xx.T, jnp.linalg.solve(Q, m_next - f(m_curr)))
+        return -jnp.einsum(
+            "ijk,k->ij", F_xx.T, jnp.linalg.solve(Q, m_next - f(m_curr))
+        )
 
     def _observation_hessian(H_xx, y, m_next):
-        return -jnp.einsum("ijk,k->ij", H_xx.T, jnp.linalg.solve(R, y - h(m_next)))
+        return -jnp.einsum(
+            "ijk,k->ij", H_xx.T, jnp.linalg.solve(R, y - h(m_next))
+        )
 
     Phi = jax.vmap(_dynamics_hessian)(F_xx, m_next, m_curr)
     Gamma = jax.vmap(_observation_hessian)(H_xx, y, m_next)
@@ -179,9 +126,11 @@ def _build_grad_and_hess(
         F_x, t = args
         hess = carry
 
-        val = - Q_inv @ F_x
+        val = -Q_inv @ F_x
         hess = jax.lax.dynamic_update_slice(hess, val, ((t + 1) * nx, t * nx))
-        hess = jax.lax.dynamic_update_slice(hess, val.T, (t * nx, (t + 1) * nx))
+        hess = jax.lax.dynamic_update_slice(
+            hess, val.T, (t * nx, (t + 1) * nx)
+        )
         return hess, _
 
     hess, _ = jax.lax.scan(_off_diagonal, hess, (F_x, jnp.arange(T - 1)))
@@ -202,12 +151,7 @@ def _build_grad_and_hess(
     hess, _ = jax.lax.scan(
         _diagonal,
         hess,
-        (
-            F_x[1:],
-            H_x[:-1],
-            Phi[1:],
-            Gamma[:-1],
-            jnp.arange(1, T - 1)),
+        (F_x[1:], H_x[:-1], Phi[1:], Gamma[:-1], jnp.arange(1, T - 1)),
     )
 
     # last diagonal

@@ -4,9 +4,9 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsc
 
-from optsmooth._base import MVNStandard, FunctionalModel
-from optsmooth._base import LinearTransition, LinearObservation
-from optsmooth._utils import mvn_logpdf, none_or_shift, none_or_concat
+from optsmooth.base import MVNStandard, FunctionalModel
+from optsmooth.base import LinearTransition, LinearObservation
+from optsmooth.utils import mvn_logpdf, none_or_shift, none_or_concat
 from optsmooth.sequential._smoothing import smoothing
 
 

@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from optsmooth import FunctionalModel, MVNStandard
-from optsmooth._base import are_inputs_compatible
+from optsmooth.base import are_inputs_compatible
 
 
 def second_order(model: Union[FunctionalModel, Callable],

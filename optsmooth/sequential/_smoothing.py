@@ -3,8 +3,8 @@ from typing import Optional, Callable
 import jax
 import jax.numpy as jnp
 
-from optsmooth._base import MVNStandard, are_inputs_compatible, FunctionalModel
-from optsmooth._utils import none_or_shift, none_or_concat
+from optsmooth.base import MVNStandard, are_inputs_compatible, FunctionalModel
+from optsmooth.utils import none_or_shift, none_or_concat
 
 
 def smoothing(

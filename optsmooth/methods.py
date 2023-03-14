@@ -3,8 +3,8 @@ from typing import Callable, Optional, Union
 import jax
 from jax import numpy as jnp
 
-from optsmooth._utils import fixed_point
-from optsmooth._base import MVNStandard, FunctionalModel
+from optsmooth.utils import fixed_point
+from optsmooth.base import MVNStandard, FunctionalModel
 from optsmooth.sequential._filtering import filtering as seq_filtering
 from optsmooth.sequential._smoothing import smoothing as seq_smoothing
 
