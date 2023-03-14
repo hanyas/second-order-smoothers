@@ -29,9 +29,9 @@ T = 500  # number of observations
 nx, ny = 5, 2
 
 _, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
-Q, R, trnas_fcn, obsrv_fcn, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
+Q, R, trans_fcn, obsrv_fcn, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
 
-trans_mdl = FunctionalModel(trnas_fcn, MVNStandard(jnp.zeros((nx,)), Q))
+trans_mdl = FunctionalModel(trans_fcn, MVNStandard(jnp.zeros((nx,)), Q))
 obsrv_mdl = FunctionalModel(obsrv_fcn, MVNStandard(jnp.zeros((ny,)), R))
 
 init_dist = MVNStandard(
