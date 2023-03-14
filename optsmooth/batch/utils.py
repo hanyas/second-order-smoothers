@@ -95,3 +95,33 @@ def line_search(x: jnp.ndarray,
     )
     xn = x + alpha * dx
     return xn
+
+
+def trust_region(
+    x: jnp.ndarray, sub: Callable, fun: Callable, lmbda: float, nu: float
+):
+    dx, df = sub(x, lmbda)
+    xn = x + dx
+
+    f, fn = fun(x), fun(xn)
+    rho = (f - fn) / df
+
+    def accept(args):
+        lmbda, nu = args
+        lmbda = lmbda * jnp.maximum(1.0 / 3.0, 1.0 - (2.0 * rho - 1) ** 3)
+        lmbda = jnp.maximum(1e-16, lmbda)
+        return xn, fn, lmbda, 2.0
+
+    def reject(args):
+        lmbda, nu = args
+        lmbda = jnp.minimum(1e16, lmbda)
+        return x, f, lmbda * nu, 2.0 * nu
+
+    xn, fn, lmbda, nu = jax.lax.cond(
+        (rho > 0.0) & (df > 0.0),
+        accept,
+        reject,
+        operand=(lmbda, nu),
+    )
+
+    return xn, fn, lmbda, nu

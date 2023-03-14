@@ -66,21 +66,19 @@ def line_search_iterated_batch_newton_smoother(
     init_cost = _flat_log_posterior(flat_init_nominal_mean)
 
     flat_nominal_mean, costs = _line_search_newton(
-        x0=flat_init_nominal_mean,
-        fun=_flat_log_posterior,
-        k=nb_iter
+        x0=flat_init_nominal_mean, fun=_flat_log_posterior, k=nb_iter
     )
 
     return _unflatten(flat_nominal_mean), jnp.hstack((init_cost, costs))
 
 
 def _build_grad_and_hess(
+    nominal_mean: jnp.ndarray,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
     quadratization_method: Callable,
-    nominal_mean: jnp.ndarray,
 ):
     y = observations
     m0, P0 = initial_dist

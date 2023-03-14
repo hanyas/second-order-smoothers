@@ -4,13 +4,16 @@ import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
-from optsmooth._base import MVNStandard, FunctionalModel
-from optsmooth._utils import mvn_logpdf
+from optsmooth.base import MVNStandard, FunctionalModel
+from optsmooth.batch.utils import (
+    log_posterior,
+    trust_region,
+)
 
 
-def _newton_step(fun: Callable, x0: jnp.ndarray, lmbda: float):
-    grad = jax.grad(fun)(x0)
-    hess = jax.hessian(fun)(x0)
+def _newton_step(x: jnp.ndarray, lmbda: float, fun: Callable):
+    grad = jax.grad(fun)(x)
+    hess = jax.hessian(fun)(x)
 
     d = hess.shape[0]
     hess_reg = hess + lmbda * jnp.eye(d)
@@ -20,70 +23,34 @@ def _newton_step(fun: Callable, x0: jnp.ndarray, lmbda: float):
     return dx, df
 
 
-def _trust_region_newton_step(
-    fun: Callable, x0: jnp.ndarray, lmbda: float, nu: float
+def _trust_region_newton(
+    x0: jnp.ndarray,
+    fun: Callable,
+    k: int,
+    lmbda: float,
+    nu: float,
 ):
-    dx, df = _newton_step(fun, x0, lmbda)
-    xn = x0 + dx
+    def body(carry, _):
+        x, lmbda, nu = carry
+        sub = lambda x, lmbda: _newton_step(x, lmbda, fun)
+        xn, fn, lmbda, nu = trust_region(x, sub, fun, lmbda, nu)
+        return (xn, lmbda, nu), fn
 
-    f0, fn = fun(x0), fun(xn)
-    rho = (f0 - fn) / df
-
-    def accept(args):
-        _, _, xn, fn, lmbda, nu = args
-        lmbda = lmbda * jnp.maximum(1.0 / 3.0, 1.0 - (2.0 * rho - 1) ** 3)
-        lmbda = jnp.maximum(1e-16, lmbda)
-        return xn, fn, lmbda, 2.0
-
-    def reject(args):
-        x0, f0, _, _, lmbda, nu = args
-        lmbda = jnp.minimum(1e16, lmbda)
-        return x0, f0, lmbda * nu, 2.0 * nu
-
-    xn, fn, lmbda, nu = jax.lax.cond(
-        (rho > 0.0) & (df > 0.0),
-        accept,
-        reject,
-        operand=(x0, f0, xn, fn, lmbda, nu),
-    )
-    return xn, lmbda, nu, fn
-
-
-def log_posterior(
-    states: jnp.ndarray,
-    observations: jnp.ndarray,
-    initial_dist: MVNStandard,
-    transition_model: FunctionalModel,
-    observation_model: FunctionalModel,
-):
-    xp, xn = states[:-1], states[1:]
-    yn = observations
-
-    m0, P0 = initial_dist
-    f, (_, Q) = transition_model
-    h, (_, R) = observation_model
-
-    xn_mu = jax.vmap(f)(xp)
-    yn_mu = jax.vmap(h)(xn)
-
-    cost = -mvn_logpdf(states[0], m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(yn, yn_mu, R))
-    return cost
+    (xn, _, _), fn = jax.lax.scan(body, (x0, lmbda, nu), jnp.arange(k))
+    return xn, fn
 
 
 def trust_region_iterated_batch_newton_smoother(
+    init_nominal_mean: jnp.ndarray,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
-    quadratization_method: Callable,
-    init_nominal_mean: jnp.ndarray,
+    nb_iter: int = 10,
     lmbda: float = 1e2,
     nu: float = 2.0,
-    nb_iter: int = 10,
 ):
-    flat_nominal_mean, _unflatten = ravel_pytree(init_nominal_mean)
+    flat_init_nominal_mean, _unflatten = ravel_pytree(init_nominal_mean)
 
     def _flat_log_posterior(flat_state):
         _state = _unflatten(flat_state)
@@ -95,30 +62,26 @@ def trust_region_iterated_batch_newton_smoother(
             observation_model,
         )
 
-    init_cost = _flat_log_posterior(flat_nominal_mean)
+    init_cost = _flat_log_posterior(flat_init_nominal_mean)
 
-    def body(carry, _):
-        flat_nominal_mean, lmbda, nu = carry
-        flat_nominal_mean, lmbda, nu, cost = _trust_region_newton_step(
-            fun=_flat_log_posterior, x0=flat_nominal_mean, lmbda=lmbda, nu=nu
-        )
-        return (flat_nominal_mean, lmbda, nu), cost
-
-    (flat_nominal_mean, lmbda, _), costs = jax.lax.scan(
-        body, (flat_nominal_mean, lmbda, nu), jnp.arange(nb_iter)
+    flat_nominal_mean, costs = _trust_region_newton(
+        x0=flat_init_nominal_mean,
+        fun=_flat_log_posterior,
+        k=nb_iter,
+        lmbda=lmbda,
+        nu=nu,
     )
 
-    nominal_mean = _unflatten(flat_nominal_mean)
-    return nominal_mean, jnp.hstack((init_cost, costs))
+    return _unflatten(flat_nominal_mean), jnp.hstack((init_cost, costs))
 
 
 def _build_grad_and_hess(
+    nominal_mean: jnp.ndarray,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
     quadratization_method: Callable,
-    nominal_mean: jnp.ndarray,
 ):
     y = observations
     m0, P0 = initial_dist
@@ -129,18 +92,26 @@ def _build_grad_and_hess(
     m_curr = nominal_mean[:-1]
     m_next = nominal_mean[1:]
 
-    f0, F_x, F_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(f, m_curr)
-    h0, H_x, H_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(h, m_next)
+    f0, F_x, F_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(
+        f, m_curr
+    )
+    h0, H_x, H_xx = jax.vmap(quadratization_method, in_axes=(None, 0))(
+        h, m_next
+    )
 
     T = nominal_mean.shape[0]
     nx = Q.shape[-1]
     ny = R.shape[-1]
 
     def _dynamics_hessian(F_xx, m_next, m_curr):
-        return -jnp.einsum("ijk,k->ij", F_xx.T, jnp.linalg.solve(Q, m_next - f(m_curr)))
+        return -jnp.einsum(
+            "ijk,k->ij", F_xx.T, jnp.linalg.solve(Q, m_next - f(m_curr))
+        )
 
     def _observation_hessian(H_xx, y, m_next):
-        return -jnp.einsum("ijk,k->ij", H_xx.T, jnp.linalg.solve(R, y - h(m_next)))
+        return -jnp.einsum(
+            "ijk,k->ij", H_xx.T, jnp.linalg.solve(R, y - h(m_next))
+        )
 
     Phi = jax.vmap(_dynamics_hessian)(F_xx, m_next, m_curr)
     Gamma = jax.vmap(_observation_hessian)(H_xx, y, m_next)
@@ -181,13 +152,7 @@ def _build_grad_and_hess(
     hess, _ = jax.lax.scan(
         _diagonal,
         hess,
-        (
-            F_x[1:],
-            H_x[:-1],
-            Phi[1:],
-            Gamma[:-1],
-            jnp.arange(1, T - 1)
-        ),
+        (F_x[1:], H_x[:-1], Phi[1:], Gamma[:-1], jnp.arange(1, T - 1)),
     )
 
     # last diagonal
