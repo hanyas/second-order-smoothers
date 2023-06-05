@@ -4,21 +4,21 @@ import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
-from optsmooth.base import MVNStandard, FunctionalModel
-from optsmooth.batch.utils import (
-    log_posterior,
+from smoothers.base import MVNStandard, FunctionalModel
+from smoothers.batch.utils import (
+    log_posterior_cost,
     residual_vector,
-    blk_diag_matrix,
-    trust_region,
+    block_diag_matrix,
+    trust_region_update,
 )
 
 
 def _gauss_newton_step(
-    x: jnp.ndarray, lmbda: float, rsd: Callable, weight: jnp.ndarray
+    x: jnp.ndarray, lmbda: float, residual: Callable, weights: jnp.ndarray
 ):
-    r = rsd(x)
-    J = jax.jacobian(rsd)(x)
-    W = weight
+    r = residual(x)
+    J = jax.jacobian(residual)(x)
+    W = weights
 
     d = x.shape[0]
     grad = jnp.dot(J.T @ W, r)
@@ -32,16 +32,16 @@ def _gauss_newton_step(
 def _trust_region_gauss_newton(
     x0: jnp.ndarray,
     fun: Callable,
-    rsd: Callable,
-    weight: jnp.ndarray,
+    residual: Callable,
+    weights: jnp.ndarray,
     k: int,
     lmbda: float,
     nu: float,
 ):
     def body(carry, _):
         x, lmbda, nu = carry
-        sub = lambda x, lmbda: _gauss_newton_step(x, lmbda, rsd, weight)
-        xn, fn, lmbda, nu = trust_region(x, sub, fun, lmbda, nu)
+        sub = lambda x, lmbda: _gauss_newton_step(x, lmbda, residual, weights)
+        xn, fn, lmbda, nu = trust_region_update(x, sub, fun, lmbda, nu)
         return (xn, lmbda, nu), fn
 
     (xn, _, _), fn = jax.lax.scan(body, (x0, lmbda, nu), jnp.arange(k))
@@ -49,23 +49,23 @@ def _trust_region_gauss_newton(
 
 
 def trust_region_iterated_batch_gauss_newton_smoother(
-    init_nominal_mean: jnp.ndarray,
+    init_nominal: jnp.ndarray,
     observations: jnp.ndarray,
-    initial_dist: MVNStandard,
+    init_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
     nb_iter: int = 10,
     lmbda: float = 1e2,
     nu: float = 2.0,
 ):
-    flat_init_nominal_mean, _unflatten = ravel_pytree(init_nominal_mean)
+    flat_init_nominal, _unflatten = ravel_pytree(init_nominal)
 
-    def _flat_log_posterior(flat_state):
+    def _flat_log_posterior_cost(flat_state):
         _state = _unflatten(flat_state)
-        return log_posterior(
+        return log_posterior_cost(
             _state,
             observations,
-            initial_dist,
+            init_dist,
             transition_model,
             observation_model,
         )
@@ -75,28 +75,28 @@ def trust_region_iterated_batch_gauss_newton_smoother(
         return residual_vector(
             _state,
             observations,
-            initial_dist,
+            init_dist,
             transition_model,
             observation_model,
         )
 
-    weight_matrix = blk_diag_matrix(
-        init_nominal_mean,
+    weight_matrix = block_diag_matrix(
+        init_nominal,
         observations,
-        initial_dist,
+        init_dist,
         transition_model,
         observation_model,
     )
 
-    init_cost = _flat_log_posterior(flat_init_nominal_mean)
+    init_cost = _flat_log_posterior_cost(flat_init_nominal)
 
-    flat_nominal_mean, costs = _trust_region_gauss_newton(
-        x0=flat_init_nominal_mean,
-        fun=_flat_log_posterior,
-        rsd=_flat_residual_vector,
-        weight=weight_matrix,
+    flat_nominal, costs = _trust_region_gauss_newton(
+        x0=flat_init_nominal,
+        fun=_flat_log_posterior_cost,
+        residual=_flat_residual_vector,
+        weights=weight_matrix,
         k=nb_iter,
         lmbda=lmbda,
         nu=nu,
     )
-    return _unflatten(flat_nominal_mean), jnp.hstack((init_cost, costs))
+    return _unflatten(flat_nominal), jnp.hstack((init_cost, costs))

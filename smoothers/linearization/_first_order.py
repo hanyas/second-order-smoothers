@@ -3,8 +3,8 @@ from typing import Any, Tuple, Union, Callable
 import jax
 import jax.numpy as jnp
 
-from optsmooth.base import MVNStandard, FunctionalModel
-from optsmooth.base import are_inputs_compatible
+from smoothers.base import MVNStandard, FunctionalModel
+from smoothers.base import are_inputs_compatible
 
 
 def linearize(model: Union[FunctionalModel, Callable],

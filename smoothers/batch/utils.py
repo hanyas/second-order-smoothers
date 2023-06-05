@@ -7,10 +7,10 @@ from jax.flatten_util import ravel_pytree
 from jax.scipy.stats import multivariate_normal as mvn
 from jaxopt import BacktrackingLineSearch
 
-from optsmooth import MVNStandard, FunctionalModel
+from smoothers import MVNStandard, FunctionalModel
 
 
-def log_posterior(
+def log_posterior_cost(
     states: jnp.ndarray,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
@@ -48,10 +48,6 @@ def residual_vector(
     xp, xn = states[:-1], states[1:]
     yn = observations
 
-    T, nx = states.shape
-    _, ny = observations.shape
-    n = nx + ny
-
     r0 = states[0] - m0
     rx = xn - jax.vmap(f)(xp)
     ry = yn - jax.vmap(h)(xn)
@@ -61,7 +57,7 @@ def residual_vector(
     return r
 
 
-def blk_diag_matrix(
+def block_diag_matrix(
     states: jnp.ndarray,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
@@ -80,10 +76,10 @@ def blk_diag_matrix(
     return blk_QR
 
 
-def line_search(x: jnp.ndarray,
-                dx: jnp.ndarray,
-                fun: Callable,
-                maxiter: int = 100):
+def line_search_update(x: jnp.ndarray,
+                       dx: jnp.ndarray,
+                       fun: Callable,
+                       maxiter: int = 100):
 
     ls = BacktrackingLineSearch(fun=fun, maxiter=maxiter,
                                 condition="strong-wolfe")
@@ -97,7 +93,7 @@ def line_search(x: jnp.ndarray,
     return xn
 
 
-def trust_region(
+def trust_region_update(
     x: jnp.ndarray, sub: Callable, fun: Callable, lmbda: float, nu: float
 ):
     dx, df = sub(x, lmbda)

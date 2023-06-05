@@ -6,10 +6,10 @@ import jax.scipy as jsc
 
 from jaxopt import BacktrackingLineSearch
 
-from optsmooth._base import MVNStandard, FunctionalModel
-from optsmooth._base import LinearTransition, LinearObservation
-from optsmooth._utils import mvn_logpdf, none_or_shift, none_or_concat
-from optsmooth.sequential._smoothing import smoothing
+from smoothers.base import MVNStandard, FunctionalModel
+from smoothers.base import LinearTransition, LinearObservation
+from smoothers.utils import mvn_logpdf, none_or_shift, none_or_concat
+from smoothers.sequential._smoothing import smoothing
 
 
 def log_posterior(
@@ -88,7 +88,9 @@ def line_search_iterated_recursive_newton_smoother(
             descent_direction=dx,
         )
 
-        smoothed_traj = MVNStandard(mean=x0 + alpha * dx, cov=smoothed_traj.cov)
+        smoothed_traj = MVNStandard(
+            mean=x0 + alpha * dx, cov=smoothed_traj.cov
+        )
         cost = _log_posterior(smoothed_traj.mean)
         return smoothed_traj, cost
 
@@ -336,7 +338,6 @@ def _recursive_newton_step(
     linearization_method: Callable,
     quadratization_method: Callable,
 ):
-
     # pre-build psdo_hess
     lin_trns_mdl, lin_obs_mdl, trns_hess, obs_hess = _build_pseudo_hessians(
         observations,
@@ -380,11 +381,13 @@ def _recursive_newton_step(
         return _local_step_func(lmbda)[0]
 
     # try with no regularization first
-    _smoothed_traj, approx_cost_diff = _local_step_func(0.0)
+    _smoothed_traj, approx_cost_diff = _local_step_func(1e-32)
 
     # modify direciton if necessary
     smoothed_traj = jax.lax.cond(
-        approx_cost_diff > 0.0, lambda: _smoothed_traj, _modify_direction,
+        approx_cost_diff > 0.0,
+        lambda: _smoothed_traj,
+        _modify_direction,
     )
 
     return smoothed_traj

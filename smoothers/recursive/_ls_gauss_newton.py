@@ -6,10 +6,10 @@ import jax.scipy as jsc
 
 from jaxopt import BacktrackingLineSearch
 
-from optsmooth._base import MVNStandard, FunctionalModel
-from optsmooth._base import LinearTransition, LinearObservation
-from optsmooth._utils import mvn_logpdf, none_or_shift, none_or_concat
-from optsmooth.sequential._smoothing import smoothing
+from smoothers.base import MVNStandard, FunctionalModel
+from smoothers.base import LinearTransition, LinearObservation
+from smoothers.utils import mvn_logpdf, none_or_shift, none_or_concat
+from smoothers.sequential._smoothing import smoothing
 
 
 def log_posterior(

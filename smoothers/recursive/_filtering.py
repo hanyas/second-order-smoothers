@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.linalg import cho_solve
 
-from optsmooth._base import MVNStandard, FunctionalModel, are_inputs_compatible
-from optsmooth._utils import none_or_shift, none_or_concat, mvn_logpdf_chol
+from smoothers.base import MVNStandard, FunctionalModel, are_inputs_compatible
+from smoothers.utils import none_or_shift, none_or_concat, mvn_logpdf_chol
 
 
 def filtering(observations: jnp.ndarray,

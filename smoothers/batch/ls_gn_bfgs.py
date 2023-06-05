@@ -4,12 +4,12 @@ import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
-from optsmooth.base import MVNStandard, FunctionalModel
-from optsmooth.batch.utils import (
-    log_posterior,
+from smoothers.base import MVNStandard, FunctionalModel
+from smoothers.batch.utils import (
+    log_posterior_cost,
     residual_vector,
-    blk_diag_matrix,
-    line_search
+    block_diag_matrix,
+    line_search_update
 )
 
 
@@ -50,7 +50,7 @@ def _line_search_gn_bfgs(
         x, rp, Jp, bfgs_hess = carry
 
         dx = _gn_bfgs_step(x, rp, Jp, W, bfgs_hess)
-        xn = line_search(x, dx, fun)
+        xn = line_search_update(x, dx, fun)
 
         # GN-BFGS hessian update
         rn = rsd(xn)
@@ -82,7 +82,7 @@ def line_search_iterated_batch_gn_bfgs_smoother(
 
     def _flat_log_posterior(flat_state):
         _state = _unflatten(flat_state)
-        return log_posterior(
+        return log_posterior_cost(
             _state,
             observations,
             initial_dist,
@@ -100,7 +100,7 @@ def line_search_iterated_batch_gn_bfgs_smoother(
             observation_model,
         )
 
-    weight_matrix = blk_diag_matrix(
+    weight_matrix = block_diag_matrix(
         init_nominal_mean,
         observations,
         initial_dist,

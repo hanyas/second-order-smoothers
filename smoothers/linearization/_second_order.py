@@ -3,8 +3,8 @@ from typing import Tuple, Any, Union, Callable
 import jax
 import jax.numpy as jnp
 
-from optsmooth import FunctionalModel, MVNStandard
-from optsmooth.base import are_inputs_compatible
+from smoothers import FunctionalModel, MVNStandard
+from smoothers.base import are_inputs_compatible
 
 
 def second_order(model: Union[FunctionalModel, Callable],

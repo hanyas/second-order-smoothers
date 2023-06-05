@@ -18,7 +18,6 @@ def mvn_logpdf(x, mu, cov):
     norm = jnp.dot(x - mu, jsc.linalg.solve(cov, x - mu))
     normalizer = logdet(cov) / 2.0 + dim * jnp.log(2.0 * jnp.pi) / 2.0
     return - 0.5 * norm - normalizer
-    # return - norm
 
 
 def mvn_logpdf_chol(x, mu, chol_cov):

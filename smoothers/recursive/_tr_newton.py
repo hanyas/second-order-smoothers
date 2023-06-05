@@ -4,10 +4,10 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsc
 
-from optsmooth.base import MVNStandard, FunctionalModel
-from optsmooth.base import LinearTransition, LinearObservation
-from optsmooth.utils import mvn_logpdf, none_or_shift, none_or_concat
-from optsmooth.sequential._smoothing import smoothing
+from smoothers.base import MVNStandard, FunctionalModel
+from smoothers.base import LinearTransition, LinearObservation
+from smoothers.utils import mvn_logpdf, none_or_shift, none_or_concat
+from smoothers.sequential._smoothing import smoothing
 
 
 def log_posterior(
@@ -33,18 +33,18 @@ def log_posterior(
     return cost
 
 
-def trust_region_iterated_recursive_gauss_newton_smoother(
+def trust_region_iterated_recursive_newton_smoother(
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
     linearization_method: Callable,
+    quadratization_method: Callable,
     init_nominal_traj: MVNStandard,
     lmbda: float = 1e2,
     nu: float = 2.0,
     nb_iter: int = 10,
 ):
-
     init_cost = log_posterior(
         init_nominal_traj.mean,
         observations,
@@ -53,21 +53,22 @@ def trust_region_iterated_recursive_gauss_newton_smoother(
         observation_model,
     )
 
-    def _gauss_newton_step(nominal_traj, lmbda):
-        return _recursive_gauss_newton_step(
+    def _newton_step(nominal_traj, lmbda):
+        return _recursive_newton_step(
             nominal_traj,
             observations,
             initial_dist,
             transition_model,
             observation_model,
             linearization_method,
+            quadratization_method,
             lmbda,
         )
 
     def body(carry, _):
         nominal_traj, lmbda, nu = carry
 
-        _smoothed_traj, approx_cost_diff = _gauss_newton_step(nominal_traj, lmbda)
+        _smoothed_traj, approx_cost_diff = _newton_step(nominal_traj, lmbda)
 
         nominal_cost = log_posterior(
             nominal_traj.mean,
@@ -157,33 +158,79 @@ def _filtering(
     return none_or_concat(Xfs, xf0, 1)
 
 
-def _linearize_models(
-    transition_model: FunctionalModel,
-    observation_model: FunctionalModel,
-    linearization_method: Callable,
-    nominal_traj: MVNStandard,
-):
-    curr_nominal = none_or_shift(nominal_traj, -1)
-    next_nominal = none_or_shift(nominal_traj, 1)
-
-    F, b, Q = jax.vmap(linearization_method, in_axes=(None, 0))(
-        transition_model, curr_nominal
-    )
-    H, c, R = jax.vmap(linearization_method, in_axes=(None, 0))(
-        observation_model, next_nominal
-    )
-
-    return (
-        LinearTransition(F, b, Q),
-        LinearObservation(H, c, R),
-    )
-
-
-def _build_gauss_newton_state_space(
+def _approx_log_posterior(
+    states: jnp.ndarray,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: LinearTransition,
     observation_model: LinearObservation,
+):
+    xp, xn = states[:-1], states[1:]
+    yn = observations
+
+    m0, P0 = initial_dist
+    F_x, b, Q = transition_model
+    H_x, c, R = observation_model
+
+    xn_mu = jnp.einsum("nij,nj->ni", F_x, xp) + b
+    yn_mu = jnp.einsum("nij,nj->ni", H_x, xn) + c
+
+    cost = -mvn_logpdf(states[0], m0, P0)
+    cost -= jnp.sum(jax.vmap(mvn_logpdf)(xn, xn_mu, Q))
+    cost -= jnp.sum(jax.vmap(mvn_logpdf)(yn, yn_mu, R))
+    return cost
+
+
+def _build_pseudo_hessians(
+    observations: jnp.ndarray,
+    transition_model: FunctionalModel,
+    observation_model: FunctionalModel,
+    quadratization_method: Callable,
+    nominal_traj: MVNStandard,
+):
+    y = observations
+    f = transition_model.function
+    h = observation_model.function
+
+    curr_nominal = none_or_shift(nominal_traj, -1)
+    next_nominal = none_or_shift(nominal_traj, 1)
+
+    F_xx, F_x, b, Q = jax.vmap(quadratization_method, in_axes=(None, 0))(
+        transition_model, curr_nominal
+    )
+    H_xx, H_x, c, R = jax.vmap(quadratization_method, in_axes=(None, 0))(
+        observation_model, next_nominal
+    )
+
+    from jax.scipy.linalg import solve
+
+    def _trns_hess_fcn(F_xx, Q, m_next, m_curr):
+        return -jnp.einsum("ijk,k->ij", F_xx.T, solve(Q, m_next - f(m_curr)))
+
+    def _obs_hess_fcn(H_xx, R, y, m_next):
+        return -jnp.einsum("ijk,k->ij", H_xx.T, solve(R, y - h(m_next)))
+
+    m_curr = curr_nominal.mean
+    m_next = next_nominal.mean
+
+    trns_hess = jax.vmap(_trns_hess_fcn)(F_xx, Q, m_next, m_curr)
+    obs_hess = jax.vmap(_obs_hess_fcn)(H_xx, R, y, m_next)
+
+    return (
+        LinearTransition(F_x, b, Q),
+        LinearObservation(H_x, c, R),
+        trns_hess,
+        obs_hess,
+    )
+
+
+def _build_newton_state_space(
+    observations: jnp.ndarray,
+    initial_dist: MVNStandard,
+    transition_model: LinearTransition,
+    observation_model: LinearObservation,
+    transition_hess: jnp.ndarray,
+    observation_hess: jnp.ndarray,
     nominal_traj: MVNStandard,
     lmbda: float,
 ):
@@ -193,32 +240,33 @@ def _build_gauss_newton_state_space(
     F, b, Q = transition_model
     H, c, R = observation_model
 
+    Phi = transition_hess
+    Gamma = observation_hess
+
     nx = Q.shape[-1]
     ny = R.shape[-1]
 
-    from jax.scipy.linalg import block_diag
+    from jax.scipy.linalg import block_diag, inv
 
     # first time step
     l0 = m0
-    L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + lmbda * jnp.eye(nx))
+    L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + Phi[0] + lmbda * jnp.eye(nx))
 
     # intermediate time steps
-    def _build_observation_model(H, c, R):
+    def _build_observation_model(H, c, R, Phi, Gamma):
         G = jnp.vstack((H, jnp.eye(nx)))
         q = jnp.hstack((c, jnp.zeros((nx,))))
-        W = block_diag(R, 1.0 / lmbda * jnp.eye(nx))
+        W = block_diag(R, inv(Phi + Gamma + lmbda * jnp.eye(nx)))
         return G, q, W
 
     G, q, W = jax.vmap(_build_observation_model)(
-        H[:-1],
-        c[:-1],
-        R[:-1],
+        H[:-1], c[:-1], R[:-1], Phi[1:], Gamma[:-1]
     )
 
     # final time step
     _G = jnp.vstack((H[-1], jnp.eye(nx)))
     _q = jnp.hstack((c[-1], jnp.zeros((nx,))))
-    _W = block_diag(R[-1], 1.0 / lmbda * jnp.eye(nx))
+    _W = block_diag(R[-1], inv(Gamma[-1] + lmbda * jnp.eye(nx)))
 
     G = jnp.stack((*G, _G))
     q = jnp.vstack((q, _q))
@@ -236,58 +284,48 @@ def _build_gauss_newton_state_space(
     )
 
 
-def _approx_log_posterior(
-    states: jnp.ndarray,
-    observations: jnp.ndarray,
-    initial_dist: MVNStandard,
-    transition_model: LinearTransition,
-    observation_model: LinearObservation,
-):
-    xp, xn = states[:-1], states[1:]
-    yn = observations
-
-    m0, P0 = initial_dist
-    F, b, Q = transition_model
-    H, c, R = observation_model
-
-    xn_mu = jnp.einsum("nij,nj->ni", F, xp) + b
-    yn_mu = jnp.einsum("nij,nj->ni", H, xn) + c
-
-    cost = -mvn_logpdf(states[0], m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn_logpdf)(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn_logpdf)(yn, yn_mu, R))
-    return cost
-
-
-def _recursive_gauss_newton_step(
+def _recursive_newton_step(
     nominal_traj: MVNStandard,
     observations: jnp.ndarray,
     initial_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
     linearization_method: Callable,
+    quadratization_method: Callable,
     lmbda: float,
 ):
-    lin_trns_mdl, lin_obs_mdl = _linearize_models(
-        transition_model, observation_model, linearization_method, nominal_traj
+    # pre-build psdo_hess
+    lin_trns_mdl, lin_obs_mdl, trns_hess, obs_hess = _build_pseudo_hessians(
+        observations,
+        transition_model,
+        observation_model,
+        quadratization_method,
+        nominal_traj,
     )
 
+    # create Newton state space model
     (
         psdo_obs,
         psdo_init,
         psdo_trns_mdl,
         psdo_obs_mdl,
-    ) = _build_gauss_newton_state_space(
+    ) = _build_newton_state_space(
         observations,
         initial_dist,
         lin_trns_mdl,
         lin_obs_mdl,
+        trns_hess,
+        obs_hess,
         nominal_traj,
         lmbda,
     )
 
-    filtered_traj = _filtering(psdo_obs, psdo_init, psdo_trns_mdl, psdo_obs_mdl)
+    # filtering on Newton SSM
+    filtered_traj = _filtering(
+        psdo_obs, psdo_init, psdo_trns_mdl, psdo_obs_mdl
+    )
 
+    # smoothing on standard SSM
     smoothed_traj = smoothing(
         transition_model,
         filtered_traj,
