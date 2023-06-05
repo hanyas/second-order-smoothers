@@ -3,12 +3,9 @@ import jax.numpy as jnp
 
 import matplotlib.pyplot as plt
 
-from optsmooth import MVNStandard
-from optsmooth import FunctionalModel
-
-from optsmooth.batch.tr_newton import (
-    trust_region_iterated_batch_newton_smoother,
-)
+from smoothers import MVNStandard
+from smoothers import FunctionalModel
+from smoothers import line_search_iterated_batch_newton_smoother
 
 from bearing_data import get_data, make_parameters
 
@@ -39,18 +36,11 @@ init_dist = MVNStandard(
     mean=jnp.array([-1.0, -1.0, 0.0, 0.0, 0.0]), cov=jnp.eye(nx)
 )
 
-init_nominal_mean = jnp.zeros((T + 1, nx))
-init_nominal_mean.at[0].set(init_dist.mean)
+init_nominal = jnp.zeros((T + 1, nx))
+init_nominal.at[0].set(init_dist.mean)
 
-smoothed_traj, costs = trust_region_iterated_batch_newton_smoother(
-    init_nominal_mean,
-    observations,
-    init_dist,
-    trans_mdl,
-    obsrv_mdl,
-    nb_iter=25,
-    lmbda=1e1,
-    nu=2.0,
+smoothed_traj, costs = line_search_iterated_batch_newton_smoother(
+    init_nominal, observations, init_dist, trans_mdl, obsrv_mdl, nb_iter=50
 )
 
 plt.figure(figsize=(7, 7))
@@ -58,7 +48,7 @@ plt.plot(
     smoothed_traj[:, 0],
     smoothed_traj[:, 1],
     "-*",
-    label="Iterated Batch Newton Smoother",
+    label="Iterated Batch Newton Smoother with Line Search",
 )
 plt.plot(true_states[:, 0], true_states[:, 1], "*", label="True")
 plt.title("Newton")

@@ -3,18 +3,16 @@ import jax.numpy as jnp
 
 import matplotlib.pyplot as plt
 
-from optsmooth import MVNStandard
-from optsmooth import FunctionalModel
+from smoothers import MVNStandard
+from smoothers import FunctionalModel
+from smoothers.batch.ls_bfgs import line_search_iterated_batch_bfgs_smoother
 
-from optsmooth.batch.ls_gn_bfgs import (
-    line_search_iterated_batch_gn_bfgs_smoother,
-)
-
-from bearing_data import get_data, make_parameters
+from examples.recursive.bearing_data import get_data, make_parameters
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
 # jax.config.update('jax_disable_jit', True)
+
 
 s1 = jnp.array([-1.5, 0.5])  # First sensor location
 s2 = jnp.array([1.0, 1.0])  # Second sensor location
@@ -38,11 +36,11 @@ init_dist = MVNStandard(
     mean=jnp.array([-1.0, -1.0, 0.0, 0.0, 0.0]), cov=jnp.eye(nx)
 )
 
-init_nominal_mean = jnp.zeros((T + 1, nx))
-init_nominal_mean.at[0].set(init_dist.mean)
+init_nominal = jnp.zeros((T + 1, nx))
+init_nominal.at[0].set(init_dist.mean)
 
-smoothed_traj, costs = line_search_iterated_batch_gn_bfgs_smoother(
-    init_nominal_mean,
+smoothed_traj, costs = line_search_iterated_batch_bfgs_smoother(
+    init_nominal,
     observations,
     init_dist,
     trans_mdl,
@@ -55,10 +53,10 @@ plt.plot(
     smoothed_traj[:, 0],
     smoothed_traj[:, 1],
     "-*",
-    label="Iterated Batch GN-BFGS Smoother",
+    label="Iterated Batch BFGS Smoother",
 )
 plt.plot(true_states[:, 0], true_states[:, 1], "*", label="True")
-plt.title("Gauss-Newton BFGS")
+plt.title("BFGS")
 plt.grid()
 plt.legend()
 plt.show()
