@@ -13,7 +13,7 @@ from smoothers import MVNStandard, FunctionalModel
 def log_posterior_cost(
     states: jnp.ndarray,
     observations: jnp.ndarray,
-    initial_dist: MVNStandard,
+    init_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
 ):
@@ -21,7 +21,7 @@ def log_posterior_cost(
     xp, xn = states[:-1], states[1:]
     yn = observations
 
-    m0, P0 = initial_dist
+    m0, P0 = init_dist
     f, (_, Q) = transition_model
     h, (_, R) = observation_model
 
@@ -37,11 +37,11 @@ def log_posterior_cost(
 def residual_vector(
     states: jnp.ndarray,
     observations: jnp.ndarray,
-    initial_dist: MVNStandard,
+    init_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
 ):
-    m0, P0 = initial_dist
+    m0, P0 = init_dist
     f = transition_model.function
     h = observation_model.function
 
@@ -60,11 +60,11 @@ def residual_vector(
 def block_diag_matrix(
     states: jnp.ndarray,
     observations: jnp.ndarray,
-    initial_dist: MVNStandard,
+    init_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
 ):
-    _, P0 = initial_dist
+    _, P0 = init_dist
     _, Q = transition_model.mvn
     _, R = observation_model.mvn
     T, _ = states.shape
