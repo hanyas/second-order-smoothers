@@ -9,7 +9,7 @@ from smoothers.batch.utils import (
     log_posterior_cost,
     residual_vector,
     block_diag_matrix,
-    line_search_update
+    line_search_update,
 )
 
 
@@ -70,21 +70,21 @@ def _line_search_bfgs(
 
 
 def line_search_iterated_batch_bfgs_smoother(
-    init_nominal_mean: jnp.ndarray,
+    init_nominal: jnp.ndarray,
     observations: jnp.ndarray,
-    initial_dist: MVNStandard,
+    init_dist: MVNStandard,
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
     nb_iter: int = 10,
 ):
-    flat_init_nominal_mean, _unflatten = ravel_pytree(init_nominal_mean)
+    flat_init_nominal, _unflatten = ravel_pytree(init_nominal)
 
-    def _flat_log_posterior(flat_state):
+    def _flat_log_posterior_cost(flat_state):
         _state = _unflatten(flat_state)
         return log_posterior_cost(
             _state,
             observations,
-            initial_dist,
+            init_dist,
             transition_model,
             observation_model,
         )
@@ -94,30 +94,30 @@ def line_search_iterated_batch_bfgs_smoother(
         return residual_vector(
             _state,
             observations,
-            initial_dist,
+            init_dist,
             transition_model,
             observation_model,
         )
 
     weight_matrix = block_diag_matrix(
-        init_nominal_mean,
+        init_nominal,
         observations,
-        initial_dist,
+        init_dist,
         transition_model,
         observation_model,
     )
 
-    init_cost = _flat_log_posterior(flat_init_nominal_mean)
-    init_gard = jax.grad(_flat_log_posterior)(flat_init_nominal_mean)
-    _jac = jax.jacobian(_flat_residual_vector)(flat_init_nominal_mean)
+    init_cost = _flat_log_posterior_cost(flat_init_nominal)
+    init_gard = jax.grad(_flat_log_posterior_cost)(flat_init_nominal)
+    _jac = jax.jacobian(_flat_residual_vector)(flat_init_nominal)
     init_hess = _jac.T @ weight_matrix @ _jac
 
-    flat_nominal_mean, costs = _line_search_bfgs(
-        x0=flat_init_nominal_mean,
-        fun=_flat_log_posterior,
+    flat_nominal, costs = _line_search_bfgs(
+        x0=flat_init_nominal,
+        fun=_flat_log_posterior_cost,
         gd=init_gard,
         hs=init_hess,
         k=nb_iter,
     )
 
-    return _unflatten(flat_nominal_mean), jnp.hstack((init_cost, costs))
+    return _unflatten(flat_nominal), jnp.hstack((init_cost, costs))

@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 
 from smoothers import MVNStandard
 from smoothers import FunctionalModel
-from smoothers.batch.ls_bfgs import line_search_iterated_batch_bfgs_smoother
+from smoothers import line_search_iterated_batch_bfgs_smoother
 
-from examples.recursive.bearing_data import get_data, make_parameters
+from bearing_data import get_data, make_parameters
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
@@ -39,14 +39,8 @@ init_dist = MVNStandard(
 init_nominal = jnp.zeros((T + 1, nx))
 init_nominal.at[0].set(init_dist.mean)
 
-smoothed_traj, costs = line_search_iterated_batch_bfgs_smoother(
-    init_nominal,
-    observations,
-    init_dist,
-    trans_mdl,
-    obsrv_mdl,
-    nb_iter=50,
-)
+smoothed_traj, costs = line_search_iterated_batch_bfgs_smoother(init_nominal, observations, init_dist, trans_mdl,
+                                                                obsrv_mdl, nb_iter=50)
 
 plt.figure(figsize=(7, 7))
 plt.plot(
