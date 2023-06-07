@@ -7,10 +7,10 @@ from smoothers import FunctionalModel, MVNStandard
 from smoothers.base import are_inputs_compatible
 
 
-def second_order(model: Union[FunctionalModel, Callable],
-                 x: Union[MVNStandard, jnp.ndarray]):
+def quadratize(model: Union[FunctionalModel, Callable],
+               x: Union[MVNStandard, jnp.ndarray]):
     """
-    Quadratization for a non-linear function f(x, q).
+    Quadratization for a nonlinear function f(x, q).
     If the function is linear, JAX Jacobian calculation will
     simply return the matrices without additional complexity.
 

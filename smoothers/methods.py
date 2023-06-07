@@ -6,7 +6,7 @@ from jax import numpy as jnp
 from smoothers.utils import fixed_point
 from smoothers.base import MVNStandard, FunctionalModel
 from smoothers.recursive._filtering import filtering as seq_filtering
-from smoothers.recursive._smoothing import smoothing as seq_smoothing
+from smoothers.recursive.utils import smoothing as seq_smoothing
 
 
 def filtering(
