@@ -97,7 +97,7 @@ def trust_region_iterated_recursive_gauss_newton_smoother(
     return smoothed_trajectory, jnp.hstack((init_cost, costs))
 
 
-def _pseudo_state_space_model(
+def _modified_state_space_model(
     observations: jnp.ndarray,
     init_dist: MVNStandard,
     linear_transtion_model: LinearTransition,
@@ -121,19 +121,19 @@ def _pseudo_state_space_model(
     L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + lmbda * jnp.eye(nx))
 
     # observed time steps
-    def _pseudo_observation_model(H, c, R):
+    def _modified_observation_model(H, c, R):
         pH = jnp.vstack((H, jnp.eye(nx)))
         pc = jnp.hstack((c, jnp.zeros((nx,))))
         pR = block_diag(R, 1.0 / lmbda * jnp.eye(nx))
         return pH, pc, pR
 
-    pHs, pcs, pRs = jax.vmap(_pseudo_observation_model)(
+    pHs, pcs, pRs = jax.vmap(_modified_observation_model)(
         Hs,
         cs,
         Rs,
     )
 
-    # pseudo observations
+    # modified observations
     next_nominal = nominal_trajectory.mean[1:]
     zs = jnp.hstack((ys, next_nominal))
 
@@ -165,11 +165,11 @@ def _recursive_gauss_newton_step(
     )
 
     (
-        psdo_observations,
-        pseudo_init_dist,
-        pseudo_transition_model,
-        pseudo_observation_model,
-    ) = _pseudo_state_space_model(
+        modified_observations,
+        modified_init_dist,
+        modified_transition_model,
+        modified_observation_model,
+    ) = _modified_state_space_model(
         observations,
         init_dist,
         linear_transition_model,
@@ -179,29 +179,29 @@ def _recursive_gauss_newton_step(
     )
 
     filtered_trajectory = filtering(
-        psdo_observations,
-        pseudo_init_dist,
-        pseudo_transition_model,
-        pseudo_observation_model,
+        modified_observations,
+        modified_init_dist,
+        modified_transition_model,
+        modified_observation_model,
     )
 
     smoothed_trajectory = smoothing(
-        linear_transition_model,
+        modified_transition_model,
         filtered_trajectory,
     )
 
     approx_cost_diff = approx_log_posterior_cost(
         nominal_trajectory.mean,
-        psdo_observations,
-        pseudo_init_dist,
-        pseudo_transition_model,
-        pseudo_observation_model,
+        modified_observations,
+        modified_init_dist,
+        modified_transition_model,
+        modified_observation_model,
     ) - approx_log_posterior_cost(
         smoothed_trajectory.mean,
-        psdo_observations,
-        pseudo_init_dist,
-        pseudo_transition_model,
-        pseudo_observation_model,
+        modified_observations,
+        modified_init_dist,
+        modified_transition_model,
+        modified_observation_model,
     )
 
     return smoothed_trajectory, approx_cost_diff
