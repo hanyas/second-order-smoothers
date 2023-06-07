@@ -1,13 +1,13 @@
 import jax
 import jax.numpy as jnp
 
-import matplotlib.pyplot as plt
-
 from smoothers import MVNStandard
 from smoothers import FunctionalModel
 from smoothers import trust_region_iterated_batch_newton_smoother
 
 from bearing_data import get_data, make_parameters
+
+import matplotlib.pyplot as plt
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
@@ -39,7 +39,7 @@ init_dist = MVNStandard(
 init_nominal = jnp.zeros((T + 1, nx))
 init_nominal.at[0].set(init_dist.mean)
 
-smoothed_traj, costs = trust_region_iterated_batch_newton_smoother(
+smoothed, costs = trust_region_iterated_batch_newton_smoother(
     init_nominal,
     observations,
     init_dist,
@@ -52,13 +52,13 @@ smoothed_traj, costs = trust_region_iterated_batch_newton_smoother(
 
 plt.figure(figsize=(7, 7))
 plt.plot(
-    smoothed_traj[:, 0],
-    smoothed_traj[:, 1],
+    smoothed[:, 0],
+    smoothed[:, 1],
     "-*",
-    label="Iterated Batch Newton Smoother with Trust Region",
+    label="Newton",
 )
 plt.plot(true_states[:, 0], true_states[:, 1], "*", label="True")
-plt.title("Newton")
+plt.title("Iterated Batch Newton Smoother with Trust Region")
 plt.grid()
 plt.legend()
 plt.show()
