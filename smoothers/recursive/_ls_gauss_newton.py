@@ -68,7 +68,7 @@ def line_search_iterated_recursive_gauss_newton_smoother(
         _smoothed_trajectory = MVNStandard(
             mean=xn, cov=_smoothed_trajectory.cov
         )
-        cost = _log_posterior_cost(smoothed_trajectory.mean)
+        cost = _log_posterior_cost(_smoothed_trajectory.mean)
         return _smoothed_trajectory, cost
 
     smoothed_trajectory, costs = jax.lax.scan(

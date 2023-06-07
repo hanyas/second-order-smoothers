@@ -124,7 +124,7 @@ def _modified_state_space_model(
     def _modified_observation_model(H, c, R):
         pH = jnp.vstack((H, jnp.eye(nx)))
         pc = jnp.hstack((c, jnp.zeros((nx,))))
-        pR = block_diag(R, 1.0 / lmbda * jnp.eye(nx))
+        pR = block_diag(R, jnp.linalg.inv(lmbda * jnp.eye(nx)))
         return pH, pc, pR
 
     pHs, pcs, pRs = jax.vmap(_modified_observation_model)(
