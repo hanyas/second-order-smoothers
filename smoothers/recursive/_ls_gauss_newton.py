@@ -6,9 +6,11 @@ import jax.numpy as jnp
 from jaxopt import BacktrackingLineSearch
 
 from smoothers.base import MVNStandard, FunctionalModel
-
-from smoothers.recursive.utils import filtering, smoothing
-from smoothers.recursive.utils import log_posterior_cost, linearize_state_space_model
+from smoothers.kalman import filtering, smoothing
+from smoothers.recursive.utils import (
+    log_posterior_cost,
+    linearize_state_space_model,
+)
 
 
 def line_search_iterated_recursive_gauss_newton_smoother(
@@ -63,7 +65,9 @@ def line_search_iterated_recursive_gauss_newton_smoother(
         )
         xn = x0 + alpha * dx
 
-        _smoothed_trajectory = MVNStandard(mean=xn, cov=_smoothed_trajectory.cov)
+        _smoothed_trajectory = MVNStandard(
+            mean=xn, cov=_smoothed_trajectory.cov
+        )
         cost = _log_posterior_cost(smoothed_trajectory.mean)
         return _smoothed_trajectory, cost
 
@@ -82,7 +86,10 @@ def _recursive_gauss_newton_step(
     linearization_method: Callable,
     nominal_trajectory: MVNStandard,
 ):
-    linear_transition_model, linear_observation_model = linearize_state_space_model(
+    (
+        linear_transition_model,
+        linear_observation_model,
+    ) = linearize_state_space_model(
         transition_model,
         observation_model,
         linearization_method,
@@ -90,9 +97,14 @@ def _recursive_gauss_newton_step(
     )
 
     filtered_trajectory = filtering(
-        observations, init_dist, linear_transition_model, linear_observation_model
+        observations,
+        init_dist,
+        linear_transition_model,
+        linear_observation_model,
     )
 
-    smoothed_trajectory = smoothing(linear_transition_model, filtered_trajectory)
+    smoothed_trajectory = smoothing(
+        linear_transition_model, filtered_trajectory
+    )
 
     return smoothed_trajectory

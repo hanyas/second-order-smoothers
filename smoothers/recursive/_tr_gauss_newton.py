@@ -5,8 +5,7 @@ import jax.numpy as jnp
 
 from smoothers.base import MVNStandard, FunctionalModel
 from smoothers.base import LinearTransition, LinearObservation
-
-from smoothers.recursive.utils import filtering, smoothing
+from smoothers.kalman import filtering, smoothing
 from smoothers.recursive.utils import (
     log_posterior_cost,
     approx_log_posterior_cost,
