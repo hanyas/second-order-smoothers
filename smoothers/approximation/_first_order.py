@@ -1,4 +1,4 @@
-from typing import Any, Tuple, Union, Callable
+from typing import Any, Tuple, Union, Callable, Optional
 
 import jax
 import jax.numpy as jnp
@@ -6,28 +6,46 @@ import jax.numpy as jnp
 from smoothers.base import MVNStandard, FunctionalModel
 
 
-def linearize(model: Union[FunctionalModel, Callable],
-              x: Union[MVNStandard, jnp.ndarray]):
+def linearize(
+    model: Union[FunctionalModel, Callable],
+    x: Union[MVNStandard, jnp.ndarray],
+    mode: Optional[Any] = "linear_coeff",
+):
     """
-    Linearization for a nonlinear function f(x, q).
+    Linearization for a nonlinear function f(x) + q, q ~ N(0, Q).
     If the function is linear, JAX Jacobian calculation will
     simply return the matrices without additional complexity.
     """
 
     if isinstance(model, FunctionalModel) and isinstance(x, MVNStandard):
-        f, q = model
+        f, (_, cov_q) = model
         m_x, _ = x
-        return _linearize_distribution(f, m_x, *q)
+        return _linearize_distribution(f, m_x, cov_q, mode)
     elif isinstance(model, Callable) and isinstance(x, jnp.ndarray):
-        return _linearize_callable(model, x)
+        return _linearize_mean(model, x, mode)
     else:
         raise NotImplementedError
 
 
-def _linearize_callable(f, x) -> Tuple[Any, Any]:
+def _first_order_taylor_coeff(f, x) -> Tuple[Any, Any]:
     return f(x), jax.jacfwd(f, 0)(x)
 
 
-def _linearize_distribution(f, x, m_q, cov_q):
-    f0, F_x = _linearize_callable(f, x)
-    return F_x, f0 - F_x @ x + m_q, cov_q
+def _linearize_distribution(f, x, cov_q, mode):
+    f0, F_x = _first_order_taylor_coeff(f, x)
+    if mode == "taylor_coeff":
+        return F_x, f0, cov_q
+    elif mode == "linear_coeff":
+        return F_x, f0 - F_x @ x, cov_q
+    else:
+        raise NotImplementedError
+
+
+def _linearize_mean(f, x,  mode):
+    f0, F_x = _first_order_taylor_coeff(f, x)
+    if mode == "taylor_coeff":
+        return F_x, f0
+    elif mode == "linear_coeff":
+        return F_x, f0 - F_x @ x
+    else:
+        raise NotImplementedError
