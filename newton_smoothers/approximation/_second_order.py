@@ -3,7 +3,7 @@ from typing import Any, Tuple, Union, Callable, Optional
 import jax
 import jax.numpy as jnp
 
-from smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.base import MVNStandard, FunctionalModel
 
 
 def quadratize(model: Union[FunctionalModel, Callable],

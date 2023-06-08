@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
-from smoothers.base import MVNStandard, FunctionalModel
-from smoothers.batch.utils import (
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.batch.utils import (
     log_posterior_cost,
     residual_vector,
     block_diag_matrix,

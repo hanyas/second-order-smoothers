@@ -3,14 +3,14 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 
-from smoothers.base import MVNStandard, FunctionalModel
-from smoothers.base import LinearTransition, LinearObservation
-from smoothers.recursive.kalman import filtering, smoothing
-from smoothers.recursive.utils import (
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.base import LinearTransition, LinearObservation
+from newton_smoothers.recursive.kalman import filtering, smoothing
+from newton_smoothers.recursive.utils import (
     log_posterior_cost,
     approx_log_posterior_cost,
 )
-from smoothers.recursive.utils import linearize_state_space_model
+from newton_smoothers.recursive.utils import linearize_state_space_model
 
 
 def trust_region_iterated_recursive_gauss_newton_smoother(

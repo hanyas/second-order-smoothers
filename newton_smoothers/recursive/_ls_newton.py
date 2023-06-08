@@ -5,15 +5,15 @@ import jax.numpy as jnp
 
 from jaxopt import BacktrackingLineSearch
 
-from smoothers.base import MVNStandard, FunctionalModel
-from smoothers.base import QuadraticTransition, QuadraticObservation
-from smoothers.base import LinearTransition, LinearObservation
-from smoothers.recursive.kalman import filtering, smoothing
-from smoothers.recursive.utils import (
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.base import QuadraticTransition, QuadraticObservation
+from newton_smoothers.base import LinearTransition, LinearObservation
+from newton_smoothers.recursive.kalman import filtering, smoothing
+from newton_smoothers.recursive.utils import (
     log_posterior_cost,
     approx_log_posterior_cost,
 )
-from smoothers.recursive.utils import quadratize_state_space_model
+from newton_smoothers.recursive.utils import quadratize_state_space_model
 
 
 def line_search_iterated_recursive_newton_smoother(

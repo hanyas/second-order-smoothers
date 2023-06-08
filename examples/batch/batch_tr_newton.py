@@ -1,8 +1,8 @@
 import jax
 import jax.numpy as jnp
 
-from smoothers.base import MVNStandard, FunctionalModel
-from smoothers import trust_region_iterated_batch_newton_smoother
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers import trust_region_iterated_batch_newton_smoother
 
 from bearing_data import get_data, make_parameters
 

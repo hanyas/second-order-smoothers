@@ -1,9 +1,9 @@
 import jax
 from jax import numpy as jnp
 
-from smoothers.base import MVNStandard
-from smoothers.base import LinearTransition, LinearObservation
-from smoothers.utils import none_or_concat, none_or_shift
+from newton_smoothers.base import MVNStandard
+from newton_smoothers.base import LinearTransition, LinearObservation
+from newton_smoothers.utils import none_or_concat, none_or_shift
 
 
 def filtering(

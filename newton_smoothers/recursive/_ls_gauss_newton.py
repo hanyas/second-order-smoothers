@@ -5,9 +5,9 @@ import jax.numpy as jnp
 
 from jaxopt import BacktrackingLineSearch
 
-from smoothers.base import MVNStandard, FunctionalModel
-from smoothers.recursive.kalman import filtering, smoothing
-from smoothers.recursive.utils import (
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.recursive.kalman import filtering, smoothing
+from newton_smoothers.recursive.utils import (
     log_posterior_cost,
     linearize_state_space_model,
 )

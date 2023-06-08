@@ -1,9 +1,9 @@
 import jax
 import jax.numpy as jnp
 
-from smoothers.base import MVNStandard, FunctionalModel
-from smoothers.approximation import quadratize
-from smoothers import line_search_iterated_recursive_newton_smoother
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.approximation import quadratize
+from newton_smoothers import line_search_iterated_recursive_newton_smoother
 
 from bearing_data import get_data, make_parameters
 

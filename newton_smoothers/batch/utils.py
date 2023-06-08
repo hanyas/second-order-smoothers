@@ -6,8 +6,8 @@ from jax.flatten_util import ravel_pytree
 
 from jaxopt import BacktrackingLineSearch
 
-from smoothers.base import MVNStandard, FunctionalModel
-from smoothers.utils import mvn_logpdf
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.utils import mvn_logpdf
 
 
 def log_posterior_cost(

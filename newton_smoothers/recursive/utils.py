@@ -3,10 +3,10 @@ from typing import Callable
 import jax
 from jax import numpy as jnp
 
-from smoothers.base import MVNStandard, FunctionalModel
-from smoothers.base import LinearTransition, LinearObservation
-from smoothers.base import QuadraticTransition, QuadraticObservation
-from smoothers.utils import mvn_logpdf, none_or_shift
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.base import LinearTransition, LinearObservation
+from newton_smoothers.base import QuadraticTransition, QuadraticObservation
+from newton_smoothers.utils import mvn_logpdf, none_or_shift
 
 
 def log_posterior_cost(
