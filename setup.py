@@ -14,6 +14,7 @@ setup(
         "jaxopt",
         "typing_extensions",
         "matplotlib",
+        "pandas"
     ],
     packages=["newton_smoothers"],
     zip_safe=False,
