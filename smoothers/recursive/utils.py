@@ -2,11 +2,11 @@ from typing import Callable
 
 import jax
 from jax import numpy as jnp
-from jax.scipy.stats import multivariate_normal as mvn
 
 from smoothers import MVNStandard, FunctionalModel
 from smoothers.base import LinearTransition, LinearObservation
-from smoothers.utils import none_or_shift
+from smoothers.base import QuadraticTransition, QuadraticObservation
+from smoothers.utils import mvn_logpdf, none_or_shift
 
 
 def log_posterior_cost(
@@ -26,9 +26,9 @@ def log_posterior_cost(
     xn_mu = jax.vmap(f)(xp)
     yn_mu = jax.vmap(h)(xn)
 
-    cost = -mvn.logpdf(states[0], m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn.logpdf, in_axes=(0, 0, None))(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn.logpdf, in_axes=(0, 0, None))(yn, yn_mu, R))
+    cost = -mvn_logpdf(states[0], m0, P0)
+    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(xn, xn_mu, Q))
+    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(yn, yn_mu, R))
     return cost
 
 
@@ -49,9 +49,9 @@ def approx_log_posterior_cost(
     xn_mu = jnp.einsum("nij,nj->ni", F_x, xp) + b
     yn_mu = jnp.einsum("nij,nj->ni", H_x, xn) + c
 
-    cost = -mvn.logpdf(states[0], m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn.logpdf)(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn.logpdf)(yn, yn_mu, R))
+    cost = -mvn_logpdf(states[0], m0, P0)
+    cost -= jnp.sum(jax.vmap(mvn_logpdf)(xn, xn_mu, Q))
+    cost -= jnp.sum(jax.vmap(mvn_logpdf)(yn, yn_mu, R))
     return cost
 
 

@@ -4,10 +4,10 @@ import jax
 from jax import numpy as jnp, scipy as jsc
 from jax.flatten_util import ravel_pytree
 
-from jax.scipy.stats import multivariate_normal as mvn
 from jaxopt import BacktrackingLineSearch
 
-from smoothers import MVNStandard, FunctionalModel
+from smoothers.base import MVNStandard, FunctionalModel
+from smoothers.utils import mvn_logpdf
 
 
 def log_posterior_cost(
@@ -28,9 +28,9 @@ def log_posterior_cost(
     xn_mu = jax.vmap(f)(xp)
     yn_mu = jax.vmap(h)(xn)
 
-    cost = - mvn.logpdf(x0, m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn.logpdf, in_axes=(0, 0, None))(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn.logpdf, in_axes=(0, 0, None))(yn, yn_mu, R))
+    cost = - mvn_logpdf(x0, m0, P0)
+    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(xn, xn_mu, Q))
+    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(yn, yn_mu, R))
     return cost
 
 
