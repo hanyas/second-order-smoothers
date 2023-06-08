@@ -1,8 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from smoothers import MVNStandard
-from smoothers import FunctionalModel
+from smoothers.base import MVNStandard, FunctionalModel
 from smoothers.approximation import extended
 from smoothers import trust_region_iterated_recursive_gauss_newton_smoother
 
