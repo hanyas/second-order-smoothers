@@ -1,8 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from smoothers import MVNStandard
-from smoothers import FunctionalModel
+from smoothers.base import MVNStandard, FunctionalModel
 from smoothers import line_search_iterated_batch_gn_bfgs_smoother
 
 from bearing_data import get_data, make_parameters
