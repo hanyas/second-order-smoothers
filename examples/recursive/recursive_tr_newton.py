@@ -1,9 +1,8 @@
 import jax
 import jax.numpy as jnp
 
-from newton_smoothers import MVNStandard
-from newton_smoothers import FunctionalModel
-from newton_smoothers import quadratize
+from newton_smoothers.base import MVNStandard, FunctionalModel
+from newton_smoothers.approximation import quadratize
 from newton_smoothers import trust_region_iterated_recursive_newton_smoother
 
 from bearing_data import get_data, make_parameters
