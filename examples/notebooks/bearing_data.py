@@ -1,15 +1,17 @@
-from functools import partial
-
 import jax.numpy as jnp
+from jax import lax, jit
+
 import numpy as np
 import scipy.linalg as linalg
-from jax import lax, jit
+
+from jax.tree_util import Partial
+
 
 __all__ = ["make_parameters", "get_data"]
 
 
 def _transition_function(x, dt):
-    """ Deterministic transition function used in the state space model
+    """Deterministic transition function used in the state space model
     Parameters
     ----------
     x: array_like
@@ -28,19 +30,25 @@ def _transition_function(x, dt):
     sinwt = jnp.sin(w * dt)
 
     def true_fun(_):
-        return coswt, 0., sinwt, dt
+        return coswt, 0.0, sinwt, dt
 
     def false_fun(_):
         coswto = coswt - 1
         return coswt, coswto / w, sinwt, sinwt / w
 
-    coswt, coswtopw, sinwt, sinwtpw = lax.cond(predicate, true_fun, false_fun, None)
+    coswt, coswtopw, sinwt, sinwtpw = lax.cond(
+        predicate, true_fun, false_fun, None
+    )
 
-    F = jnp.array([[1, 0, sinwtpw, -coswtopw, 0],
-                   [0, 1, coswtopw, sinwtpw, 0],
-                   [0, 0, coswt, sinwt, 0],
-                   [0, 0, -sinwt, coswt, 0],
-                   [0, 0, 0, 0, 1]])
+    F = jnp.array(
+        [
+            [1, 0, sinwtpw, -coswtopw, 0],
+            [0, 1, coswtopw, sinwtpw, 0],
+            [0, 0, coswt, sinwt, 0],
+            [0, 0, -sinwt, coswt, 0],
+            [0, 0, 0, 0, 1],
+        ]
+    )
     return F @ x
 
 
@@ -49,14 +57,14 @@ def _transition_function_dx(x, dt):
     predicate = jnp.abs(w) < 1e-6
 
     def true_fun(_):
-        coswt = 1.
-        coswto = 0.
-        coswtopw = 0.
-        sinwt = 0.
+        coswt = 1.0
+        coswto = 0.0
+        coswtopw = 0.0
+        sinwt = 0.0
         sinwtpw = dt
 
-        dsinwtpw = 0.
-        dcoswtopw = -0.5 * dt ** 2
+        dsinwtpw = 0.0
+        dcoswtopw = -0.5 * dt**2
         return coswt, coswto, coswtopw, sinwt, sinwtpw, dsinwtpw, dcoswtopw
 
     def false_fun(_):
@@ -67,17 +75,23 @@ def _transition_function_dx(x, dt):
         sinwt = jnp.sin(w * dt)
         sinwtpw = sinwt / w
 
-        dsinwtpw = (w * dt * coswt - sinwt) / (w ** 2)
-        dcoswtopw = (-w * dt * sinwt - coswto) / (w ** 2)
+        dsinwtpw = (w * dt * coswt - sinwt) / (w**2)
+        dcoswtopw = (-w * dt * sinwt - coswto) / (w**2)
         return coswt, coswto, coswtopw, sinwt, sinwtpw, dsinwtpw, dcoswtopw
 
-    coswt, coswto, coswtopw, sinwt, sinwtpw, dsinwtpw, dcoswtopw = lax.cond(predicate, true_fun, false_fun, None)
+    coswt, coswto, coswtopw, sinwt, sinwtpw, dsinwtpw, dcoswtopw = lax.cond(
+        predicate, true_fun, false_fun, None
+    )
 
-    df = jnp.array([[1., 0., sinwtpw, -coswtopw, dsinwtpw * x[2] - dcoswtopw * x[3]],
-                    [0, 1, coswtopw, sinwtpw, dcoswtopw * x[2] + dsinwtpw * x[3]],
-                    [0, 0, coswt, sinwt, -dt * sinwt * x[2] + dt * coswt * x[3]],
-                    [0, 0, -sinwt, coswt, -dt * coswt * x[2] - dt * sinwt * x[3]],
-                    [0, 0, 0, 0, 1]])
+    df = jnp.array(
+        [
+            [1.0, 0.0, sinwtpw, -coswtopw, dsinwtpw * x[2] - dcoswtopw * x[3]],
+            [0, 1, coswtopw, sinwtpw, dcoswtopw * x[2] + dsinwtpw * x[3]],
+            [0, 0, coswt, sinwt, -dt * sinwt * x[2] + dt * coswt * x[3]],
+            [0, 0, -sinwt, coswt, -dt * coswt * x[2] - dt * sinwt * x[3]],
+            [0, 0, 0, 0, 1],
+        ]
+    )
 
     return df
 
@@ -98,16 +112,36 @@ def _observation_function(x, s1, s2):
     y: array_like
         The observed angles, the first component is the angle w.r.t. the first sensor, the second w.r.t the second.
     """
-    return jnp.array([jnp.arctan2(x[1] - s1[1], x[0] - s1[0]),
-                      jnp.arctan2(x[1] - s2[1], x[0] - s2[0])])
+    return jnp.array(
+        [
+            jnp.arctan2(x[1] - s1[1], x[0] - s1[0]),
+            jnp.arctan2(x[1] - s2[1], x[0] - s2[0]),
+        ]
+    )
 
 
 def _observation_function_dx(x, s1, s2):
-    return jnp.array([[-(x[1]-s1[1])/((x[0]-s1[0])**2+(x[1]-s1[1])**2), (x[0]-s1[0])/((x[0]-s1[0])**2+(x[1]-s1[1])**2),  0, 0, 0],
-                             [-(x[1]-s2[1])/((x[0]-s2[0])**2+(x[1]-s2[1])**2), (x[0]-s2[0])/((x[0]-s2[0])**2+(x[1]-s2[1])**2),  0, 0, 0]])
+    return jnp.array(
+        [
+            [
+                -(x[1] - s1[1]) / ((x[0] - s1[0]) ** 2 + (x[1] - s1[1]) ** 2),
+                (x[0] - s1[0]) / ((x[0] - s1[0]) ** 2 + (x[1] - s1[1]) ** 2),
+                0,
+                0,
+                0,
+            ],
+            [
+                -(x[1] - s2[1]) / ((x[0] - s2[0]) ** 2 + (x[1] - s2[1]) ** 2),
+                (x[0] - s2[0]) / ((x[0] - s2[0]) ** 2 + (x[1] - s2[1]) ** 2),
+                0,
+                0,
+                0,
+            ],
+        ]
+    )
 
 
-@partial(jnp.vectorize, excluded=(1, 2), signature="(m)->(d)")
+@Partial(jnp.vectorize, excluded=(1, 2), signature="(m)->(d)")
 def inverse_bearings(observation, s1, s2):
     """
     Inverse the bearings observation to the location as if there was no noise,
@@ -126,15 +160,13 @@ def inverse_bearings(observation, s1, s2):
         The inversed position of the state
     """
     tan_theta = jnp.tan(observation)
-    A = jnp.array([[tan_theta[0], -1],
-                   [tan_theta[1], -1]])
-    b = jnp.array([s1[0] * tan_theta[0] - s1[1],
-                   s2[0] * tan_theta[1] - s2[1]])
+    A = jnp.array([[tan_theta[0], -1], [tan_theta[1], -1]])
+    b = jnp.array([s1[0] * tan_theta[0] - s1[1], s2[0] * tan_theta[1] - s2[1]])
     return jnp.linalg.solve(A, b)
 
 
 def make_parameters(qc, qw, r, dt, s1, s2):
-    """ Discretizes the model with continuous transition noise qc, for step-size dt.
+    """Discretizes the model with continuous transition noise qc, for step-size dt.
     The model is described in "Multitarget-multisensor tracking: principles and techniques" by
     Bar-Shalom, Yaakov and Li, Xiao-Rong
     Parameters
@@ -161,35 +193,45 @@ def make_parameters(qc, qw, r, dt, s1, s2):
         The observation function
     transition_function: callable
         The transition function
+    transition_function_dx: callable
+        The derivative of transition function
     observation_function_dx: callable
         The derivative of observation function
-     transition_function_dx: callable
-        The derivative of transition function
     """
 
-    Q = jnp.array([[qc * dt ** 3 / 3, 0, qc * dt ** 2 / 2, 0, 0],
-                   [0, qc * dt ** 3 / 3, 0, qc * dt ** 2 / 2, 0],
-                   [qc * dt ** 2 / 2, 0, qc * dt, 0, 0],
-                   [0, qc * dt ** 2 / 2, 0, qc * dt, 0],
-                   [0, 0, 0, 0, dt * qw]])
+    Q = jnp.array(
+        [
+            [qc * dt**3 / 3, 0, qc * dt**2 / 2, 0, 0],
+            [0, qc * dt**3 / 3, 0, qc * dt**2 / 2, 0],
+            [qc * dt**2 / 2, 0, qc * dt, 0, 0],
+            [0, qc * dt**2 / 2, 0, qc * dt, 0],
+            [0, 0, 0, 0, dt * qw],
+        ]
+    )
 
-    R = r ** 2 * jnp.eye(2)
+    R = r**2 * jnp.eye(2)
 
-    observation_function = jit(partial(_observation_function, s1=s1, s2=s2))
-    transition_function = jit(partial(_transition_function, dt=dt))
-    observation_function_dx = jit(partial(_observation_function_dx, s1=s1, s2=s2))
-    transition_function_dx = jit(partial(_transition_function_dx, dt=dt))
+    observation_function = Partial(_observation_function, s1=s1, s2=s2)
+    transition_function = Partial(_transition_function, dt=dt)
+    observation_function_dx = Partial(_observation_function_dx, s1=s1, s2=s2)
+    transition_function_dx = Partial(_transition_function_dx, dt=dt)
 
-    return Q, R, observation_function, transition_function, observation_function_dx, transition_function_dx
+    return (
+        Q,
+        R,
+        transition_function,
+        observation_function,
+        transition_function_dx,
+        observation_function_dx,
+    )
 
 
 def _get_data(x, dt, a_s, s1, s2, r, normals, observations, true_states):
     for i, a in enumerate(a_s):
-#         with nb.objmode(x='float32[::1]'):
-        F = np.array([[0, 0, 1, 0],
-                      [0, 0, 0, 1],
-                      [0, 0, 0, a],
-                      [0, 0, -a, 0]], dtype=np.float32)
+        F = np.array(
+            [[0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, a], [0, 0, -a, 0]],
+            dtype=np.float32,
+        )
         x = linalg.expm(F * dt) @ x
         y1 = np.arctan2(x[1] - s1[1], x[0] - s1[0]) + r * normals[i, 0]
         y2 = np.arctan2(x[1] - s2[1], x[0] - s2[0]) + r * normals[i, 1]
@@ -200,7 +242,7 @@ def _get_data(x, dt, a_s, s1, s2, r, normals, observations, true_states):
     return true_states, observations
 
 
-def get_data(x0, dt, r, T, s1, s2, q=10., random_state=None):
+def get_data(x0, dt, r, T, s1, s2, q=10.0, random_state=None):
     """
     Parameters
     ----------
@@ -238,13 +280,10 @@ def get_data(x0, dt, r, T, s1, s2, q=10., random_state=None):
 
     x = np.copy(x0).astype(np.float32)
     observations = np.empty((T, 2), dtype=np.float32)
-    true_states = np.zeros((T+1, 5), dtype=np.float32)
+    true_states = np.zeros((T + 1, 5), dtype=np.float32)
     ts = np.linspace(dt, (T + 1) * dt, T).astype(np.float32)
     true_states[0, :4] = x
     normals = random_state.randn(T, 2).astype(np.float32)
 
     _get_data(x, dt, a_s, s1, s2, r, normals, observations, true_states[1:])
     return ts, true_states, observations
-
-
-
