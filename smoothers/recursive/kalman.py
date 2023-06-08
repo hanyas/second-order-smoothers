@@ -23,8 +23,7 @@ def filtering(
         m, P = x
 
         S = R + H @ P @ H.T
-        chol_S = jnp.linalg.cholesky(S)
-        G = P @ jsc.linalg.cho_solve((chol_S, True), H).T
+        G = jnp.linalg.solve(S.T, H @ P.T).T
 
         y_hat = H @ m + c
         y_diff = y - y_hat
