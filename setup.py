@@ -6,7 +6,15 @@ setup(
     description="Second-order iterated smoothers for state estimation",
     author="Hany Abdulsamad, Fatemeh Yaghoobi",
     author_email="hany@robot-learning.de",
-    install_requires=["numpy", "scipy", "jax", "jaxlib", "matplotlib"],
+    install_requires=[
+        "numpy",
+        "scipy",
+        "jax",
+        "jaxlib",
+        "jaxopt",
+        "typing_extensions",
+        "matplotlib",
+    ],
     packages=["newton_smoothers"],
     zip_safe=False,
 )
