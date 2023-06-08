@@ -1,7 +1,7 @@
 import jax
-from jax import numpy as jnp, scipy as jsc
+from jax import numpy as jnp
 
-from smoothers import MVNStandard
+from smoothers.base import MVNStandard
 from smoothers.base import LinearTransition, LinearObservation
 from smoothers.utils import none_or_concat, none_or_shift
 
