@@ -24,14 +24,14 @@ class LinearObservation(NamedTuple):
 class QuadraticTransition(NamedTuple):
     F_xx: jnp.ndarray
     F_x: jnp.ndarray
-    b: jnp.ndarray
+    f0: jnp.ndarray
     Q: jnp.ndarray
 
 
 class QuadraticObservation(NamedTuple):
     H_xx: jnp.ndarray
     H_x: jnp.ndarray
-    c: jnp.ndarray
+    h0: jnp.ndarray
     R: jnp.ndarray
 
 

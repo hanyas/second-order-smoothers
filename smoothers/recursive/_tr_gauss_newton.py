@@ -20,9 +20,9 @@ def trust_region_iterated_recursive_gauss_newton_smoother(
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
     linearization_method: Callable,
+    nb_iter: int = 10,
     lmbda: float = 1e2,
     nu: float = 2.0,
-    nb_iter: int = 10,
 ):
     init_cost = log_posterior_cost(
         init_nominal.mean,
@@ -108,11 +108,11 @@ def _modified_state_space_model(
     m0, P0 = init_dist
     ys = observations
 
-    Fs, bs, Qs = linear_transtion_model
-    Hs, cs, Rs = linear_observation_model
+    F, b, Q = linear_transtion_model
+    H, c, R = linear_observation_model
 
-    nx = Qs.shape[-1]
-    ny = Rs.shape[-1]
+    nx = Q.shape[-1]
+    ny = R.shape[-1]
 
     from jax.scipy.linalg import block_diag
 
@@ -122,26 +122,26 @@ def _modified_state_space_model(
 
     # observed time steps
     def _modified_observation_model(H, c, R):
-        pH = jnp.vstack((H, jnp.eye(nx)))
-        pc = jnp.hstack((c, jnp.zeros((nx,))))
-        pR = block_diag(R, jnp.linalg.inv(lmbda * jnp.eye(nx)))
-        return pH, pc, pR
+        mH = jnp.vstack((H, jnp.eye(nx)))
+        mc = jnp.hstack((c, jnp.zeros((nx,))))
+        mR = block_diag(R, jnp.linalg.inv(lmbda * jnp.eye(nx)))
+        return mH, mc, mR
 
-    pHs, pcs, pRs = jax.vmap(_modified_observation_model)(
-        Hs,
-        cs,
-        Rs,
+    mH, mc, mR = jax.vmap(_modified_observation_model)(
+        H,
+        c,
+        R,
     )
 
     # modified observations
-    next_nominal = nominal_trajectory.mean[1:]
-    zs = jnp.hstack((ys, next_nominal))
+    xn = nominal_trajectory.mean[1:]
+    zs = jnp.hstack((ys, xn))
 
     return (
         zs,
         MVNStandard(l0, L0),
-        LinearTransition(Fs, bs, Qs),
-        LinearObservation(pHs, pcs, pRs),
+        LinearTransition(F, b, Q),
+        LinearObservation(mH, mc, mR),
     )
 
 

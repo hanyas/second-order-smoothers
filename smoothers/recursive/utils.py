@@ -3,7 +3,7 @@ from typing import Callable
 import jax
 from jax import numpy as jnp
 
-from smoothers import MVNStandard, FunctionalModel
+from smoothers.base import MVNStandard, FunctionalModel
 from smoothers.base import LinearTransition, LinearObservation
 from smoothers.base import QuadraticTransition, QuadraticObservation
 from smoothers.utils import mvn_logpdf, none_or_shift
@@ -64,11 +64,30 @@ def linearize_state_space_model(
     curr_nominal = none_or_shift(nominal_trajectory, -1)
     next_nominal = none_or_shift(nominal_trajectory, 1)
 
-    Fs, bs, Qs = jax.vmap(linearization_method, in_axes=(None, 0))(
+    F, b, Q = jax.vmap(linearization_method, in_axes=(None, 0))(
         transition_model, curr_nominal
     )
-    Hs, cs, Rs = jax.vmap(linearization_method, in_axes=(None, 0))(
+    H, c, R = jax.vmap(linearization_method, in_axes=(None, 0))(
         observation_model, next_nominal
     )
 
-    return LinearTransition(Fs, bs, Qs), LinearObservation(Hs, cs, Rs)
+    return LinearTransition(F, b, Q), LinearObservation(H, c, R)
+
+
+def quadratize_state_space_model(
+    transition_model: FunctionalModel,
+    observation_model: FunctionalModel,
+    quadratization_method: Callable,
+    nominal_trajectory: MVNStandard,
+):
+    curr_nominal = none_or_shift(nominal_trajectory, -1)
+    next_nominal = none_or_shift(nominal_trajectory, 1)
+
+    F_xx, F_x, f0, Q = jax.vmap(quadratization_method, in_axes=(None, 0, None))(
+        transition_model, curr_nominal, "taylor_coeff"
+    )
+    H_xx, H_x, h0, R = jax.vmap(quadratization_method, in_axes=(None, 0, None))(
+        observation_model, next_nominal, "taylor_coeff"
+    )
+
+    return QuadraticTransition(F_xx, F_x, f0, Q), QuadraticObservation(H_xx, H_x, h0, R)
