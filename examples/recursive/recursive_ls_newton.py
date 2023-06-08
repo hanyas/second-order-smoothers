@@ -1,16 +1,13 @@
 import jax
 import jax.numpy as jnp
 
-from smoothers import MVNStandard
-from smoothers import FunctionalModel
-from smoothers.linearization import extended, second_order
-from smoothers.sequential._ls_newton import (
-    line_search_iterated_recursive_newton_smoother,
-)
-
-import matplotlib.pyplot as plt
+from smoothers.base import MVNStandard, FunctionalModel
+from smoothers.approximation import quadratize
+from smoothers import line_search_iterated_recursive_newton_smoother
 
 from bearing_data import get_data, make_parameters
+
+import matplotlib.pyplot as plt
 
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_enable_x64", True)
@@ -30,42 +27,41 @@ T = 500  # number of observations
 nx, ny = 5, 2
 
 _, true_states, observations = get_data(x0, dt, r, T, s1, s2, random_state=42)
-Q, R, trns_fcn, obs_fcn, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
+Q, R, trans_fcn, obsrv_fcn, _, _ = make_parameters(qc, qw, r, dt, s1, s2)
 
-trns_mdl = FunctionalModel(trns_fcn, MVNStandard(jnp.zeros((nx,)), Q))
-obs_mdl = FunctionalModel(obs_fcn, MVNStandard(jnp.zeros((ny,)), R))
+trans_mdl = FunctionalModel(trans_fcn, MVNStandard(jnp.zeros((nx,)), Q))
+obsrv_mdl = FunctionalModel(obsrv_fcn, MVNStandard(jnp.zeros((ny,)), R))
 
 init_dist = MVNStandard(
     mean=jnp.array([-1.0, -1.0, 0.0, 0.0, 0.0]), cov=jnp.eye(nx)
 )
 
-nominal_traj = MVNStandard(
+init_nominal = MVNStandard(
     mean=jnp.zeros((T + 1, nx)),
     cov=jnp.repeat(jnp.eye(nx).reshape(1, nx, nx), T + 1, axis=0),
 )
-nominal_traj.mean.at[0].set(init_dist.mean)
-nominal_traj.cov.at[0].set(init_dist.cov)
+init_nominal.mean.at[0].set(init_dist.mean)
+init_nominal.cov.at[0].set(init_dist.cov)
 
-smoothed_traj, costs = line_search_iterated_recursive_newton_smoother(
+smoothed, costs = line_search_iterated_recursive_newton_smoother(
+    init_nominal,
     observations,
     init_dist,
-    trns_mdl,
-    obs_mdl,
-    extended,
-    second_order,
-    nominal_traj,
+    trans_mdl,
+    obsrv_mdl,
+    quadratize,
     nb_iter=25,
 )
 
 plt.figure(figsize=(7, 7))
 plt.plot(
-    smoothed_traj.mean[:, 0],
-    smoothed_traj.mean[:, 1],
+    smoothed.mean[:, 0],
+    smoothed.mean[:, 1],
     "-*",
-    label="Iterated Recursive Newton Smoother",
+    label="Newton",
 )
 plt.plot(true_states[:, 0], true_states[:, 1], "*", label="True")
-plt.title("Newton")
+plt.title("Iterated Recursive Newton Smoother with Line Search")
 plt.grid()
 plt.legend()
 plt.show()

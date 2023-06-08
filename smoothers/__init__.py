@@ -12,5 +12,6 @@ from .batch import line_search_iterated_batch_gn_bfgs_smoother
 from .recursive import line_search_iterated_recursive_gauss_newton_smoother
 from .recursive import trust_region_iterated_recursive_gauss_newton_smoother
 
+from .recursive import line_search_iterated_recursive_newton_smoother
 from .recursive import trust_region_iterated_recursive_newton_smoother
 

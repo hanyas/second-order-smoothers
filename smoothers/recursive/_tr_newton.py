@@ -34,7 +34,7 @@ def trust_region_iterated_recursive_newton_smoother(
     )
 
     def _newton_step(nominal_trajectory, lmbda):
-        return _recursive_newton_step(
+        return _regularized_recursive_newton_step(
             observations,
             init_dist,
             transition_model,
@@ -162,7 +162,7 @@ def _modified_state_space_model(
     )
 
 
-def _recursive_newton_step(
+def _regularized_recursive_newton_step(
     observations: jnp.ndarray,
     init_dist: MVNStandard,
     transition_model: FunctionalModel,
