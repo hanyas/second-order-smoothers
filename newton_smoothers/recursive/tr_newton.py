@@ -139,9 +139,9 @@ def _modified_state_space_model(
     from jax.scipy.linalg import block_diag
 
     # first time step
-    _Phi0 = Psi[0] + lmbda * jnp.eye(nx)
-    L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + _Phi0)
-    l0 = L0 @ (jnp.linalg.inv(P0) @ m0 + _Phi0 @ x0)
+    _Phi0_inv = Psi[0] + lmbda * jnp.eye(nx)
+    L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + _Phi0_inv)
+    l0 = L0 @ (jnp.linalg.inv(P0) @ m0 + _Phi0_inv @ x0)
 
     # observed time steps
     def _modified_observation_model(H, c, R, Psi, Gamma):
