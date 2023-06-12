@@ -109,6 +109,7 @@ def _modified_state_space_model(
     m0, P0 = init_dist
 
     ys = observations
+    x0 = nominal_trajectory.mean[0]
     xp = nominal_trajectory.mean[:-1]
     xn = nominal_trajectory.mean[1:]
 
@@ -123,8 +124,8 @@ def _modified_state_space_model(
     def _transition_params(F_xx, F_x, f0, Q, xn, xp):
         F = F_x
         b = f0 - F_x @ xp
-        Phi = -jnp.einsum("ijk,k->ij", F_xx.T, solve(Q, xn - f0))
-        return F, b, Phi
+        Psi = -jnp.einsum("ijk,k->ij", F_xx.T, solve(Q, xn - f0))
+        return F, b, Psi
 
     def _observation_params(H_xx, H_x, h0, R, yn, xn):
         H = H_x
@@ -132,24 +133,25 @@ def _modified_state_space_model(
         Gamma = -jnp.einsum("ijk,k->ij", H_xx.T, solve(R, yn - h0))
         return H, c, Gamma
 
-    F, b, Phi = jax.vmap(_transition_params)(F_xx, F_x, f0, Q, xn, xp)
+    F, b, Psi = jax.vmap(_transition_params)(F_xx, F_x, f0, Q, xn, xp)
     H, c, Gamma = jax.vmap(_observation_params)(H_xx, H_x, h0, R, ys, xn)
 
     from jax.scipy.linalg import block_diag
 
     # first time step
-    l0 = m0
-    L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + Phi[0] + lmbda * jnp.eye(nx))
+    _Phi0 = Psi[0] + lmbda * jnp.eye(nx)
+    L0 = jnp.linalg.inv(jnp.linalg.inv(P0) + _Phi0)
+    l0 = L0 @ (jnp.linalg.inv(P0) @ m0 + _Phi0 @ x0)
 
     # observed time steps
-    def _modified_observation_model(H, c, R, Phi, Gamma):
+    def _modified_observation_model(H, c, R, Psi, Gamma):
         mH = jnp.vstack((H, jnp.eye(nx)))
         mc = jnp.hstack((c, jnp.zeros((nx,))))
-        mR = block_diag(R, jnp.linalg.inv(Phi + Gamma + lmbda * jnp.eye(nx)))
+        mR = block_diag(R, jnp.linalg.inv(Psi + Gamma + lmbda * jnp.eye(nx)))
         return mH, mc, mR
 
-    _Phi = jnp.stack((*Phi[1:], jnp.zeros((nx, nx))))
-    mH, mc, mR = jax.vmap(_modified_observation_model)(H, c, R, _Phi, Gamma)
+    _Psi = jnp.stack((*Psi[1:], jnp.zeros((nx, nx))))
+    mH, mc, mR = jax.vmap(_modified_observation_model)(H, c, R, _Psi, Gamma)
 
     # modified observations
     zs = jnp.hstack((ys, xn))
