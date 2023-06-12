@@ -45,8 +45,6 @@ smoothed, costs = trust_region_iterated_batch_gauss_newton_smoother(
     trans_mdl,
     obsrv_mdl,
     nb_iter=25,
-    lmbda=1e1,
-    nu=2.0,
 )
 
 plt.figure(figsize=(7, 7))

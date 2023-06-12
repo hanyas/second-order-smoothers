@@ -51,8 +51,6 @@ smoothed, costs = trust_region_iterated_recursive_newton_smoother(
     obsrv_mdl,
     quadratize,
     nb_iter=25,
-    lmbda=1e2,
-    nu=2.0,
 )
 
 plt.figure(figsize=(7, 7))
