@@ -6,6 +6,11 @@ import jax.scipy as jsc
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
 
+def weighted_sqr_dist(x, mu, cov):
+    sqr_dist = 0.5 * jnp.dot(x - mu, jsc.linalg.solve(cov, x - mu))
+    return sqr_dist
+
+
 def mvn_logpdf(x, mu, cov):
     d = cov.shape[0]
     dist = -0.5 * jnp.dot(x - mu, jsc.linalg.solve(cov, x - mu))

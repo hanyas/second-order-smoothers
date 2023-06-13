@@ -7,7 +7,7 @@ from jax.flatten_util import ravel_pytree
 from jaxopt import BacktrackingLineSearch
 
 from newton_smoothers.base import MVNStandard, FunctionalModel
-from newton_smoothers.utils import mvn_logpdf
+from newton_smoothers.utils import weighted_sqr_dist
 
 
 def log_posterior_cost(
@@ -28,9 +28,9 @@ def log_posterior_cost(
     xn_mu = jax.vmap(f)(xp)
     yn_mu = jax.vmap(h)(xn)
 
-    cost = - mvn_logpdf(x0, m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(yn, yn_mu, R))
+    cost = weighted_sqr_dist(x0, m0, P0)
+    cost += jnp.sum(jax.vmap(weighted_sqr_dist, in_axes=(0, 0, None))(xn, xn_mu, Q))
+    cost += jnp.sum(jax.vmap(weighted_sqr_dist, in_axes=(0, 0, None))(yn, yn_mu, R))
     return cost
 
 

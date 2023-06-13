@@ -6,7 +6,7 @@ from jax import numpy as jnp
 from newton_smoothers.base import MVNStandard, FunctionalModel
 from newton_smoothers.base import LinearTransition, LinearObservation
 from newton_smoothers.base import QuadraticTransition, QuadraticObservation
-from newton_smoothers.utils import mvn_logpdf, none_or_shift
+from newton_smoothers.utils import weighted_sqr_dist, none_or_shift
 
 
 def log_posterior_cost(
@@ -26,9 +26,9 @@ def log_posterior_cost(
     xn_mu = jax.vmap(f)(xp)
     yn_mu = jax.vmap(h)(xn)
 
-    cost = -mvn_logpdf(states[0], m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn_logpdf, in_axes=(0, 0, None))(yn, yn_mu, R))
+    cost = weighted_sqr_dist(states[0], m0, P0)
+    cost += jnp.sum(jax.vmap(weighted_sqr_dist, in_axes=(0, 0, None))(xn, xn_mu, Q))
+    cost += jnp.sum(jax.vmap(weighted_sqr_dist, in_axes=(0, 0, None))(yn, yn_mu, R))
     return cost
 
 
@@ -49,9 +49,9 @@ def approx_log_posterior_cost(
     xn_mu = jnp.einsum("nij,nj->ni", F_x, xp) + b
     yn_mu = jnp.einsum("nij,nj->ni", H_x, xn) + c
 
-    cost = -mvn_logpdf(states[0], m0, P0)
-    cost -= jnp.sum(jax.vmap(mvn_logpdf)(xn, xn_mu, Q))
-    cost -= jnp.sum(jax.vmap(mvn_logpdf)(yn, yn_mu, R))
+    cost = weighted_sqr_dist(states[0], m0, P0)
+    cost += jnp.sum(jax.vmap(weighted_sqr_dist)(xn, xn_mu, Q))
+    cost += jnp.sum(jax.vmap(weighted_sqr_dist)(yn, yn_mu, R))
     return cost
 
 
