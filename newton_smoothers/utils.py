@@ -6,6 +6,10 @@ import jax.scipy as jsc
 logdet = lambda x: jnp.linalg.slogdet(x)[1]
 
 
+def symmetrize(x):
+    return 0.5 * (x + x.T)
+
+
 def weighted_sqr_dist(x, mu, cov):
     sqr_dist = 0.5 * jnp.dot(x - mu, jsc.linalg.solve(cov, x - mu))
     return sqr_dist

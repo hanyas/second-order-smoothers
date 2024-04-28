@@ -76,13 +76,17 @@ def block_diag_matrix(
     return blk_QR
 
 
-def line_search_update(x: jnp.ndarray,
-                       dx: jnp.ndarray,
-                       fun: Callable,
-                       maxiter: int = 100):
-
-    ls = BacktrackingLineSearch(fun=fun, maxiter=maxiter,
-                                condition="strong-wolfe")
+def line_search_update(
+    x: jnp.ndarray,
+    dx: jnp.ndarray,
+    fun: Callable,
+    maxiter: int = 100
+):
+    ls = BacktrackingLineSearch(
+        fun=fun,
+        maxiter=maxiter,
+        condition="strong-wolfe"
+    )
 
     alpha, _ = ls.run(
         init_stepsize=1.0,

@@ -1,9 +1,10 @@
 import jax
 from jax import numpy as jnp
+from jax import scipy as jsc
 
 from newton_smoothers.base import MVNStandard
 from newton_smoothers.base import LinearTransition, LinearObservation
-from newton_smoothers.utils import none_or_concat, none_or_shift
+from newton_smoothers.utils import none_or_concat, none_or_shift, symmetrize
 
 
 def filtering(
@@ -23,7 +24,7 @@ def filtering(
         m, P = x
 
         S = R + H @ P @ H.T
-        G = jnp.linalg.solve(S.T, H @ P.T).T
+        G = jsc.linalg.solve(S.T, H @ P.T).T
 
         y_hat = H @ m + c
         y_diff = y - y_hat
@@ -64,7 +65,7 @@ def smoothing(
         S = F @ Pf @ F.T + Q
         cov_diff = Ps - S
 
-        gain = Pf @ jnp.linalg.solve(S, F).T
+        gain = Pf @ jsc.linalg.solve(S, F).T
         ms = mf + gain @ mean_diff
         Ps = Pf + gain @ cov_diff @ gain.T
         return MVNStandard(ms, Ps)

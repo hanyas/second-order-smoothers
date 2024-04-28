@@ -2,6 +2,8 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
+import jax.scipy as jsc
+
 from jax.flatten_util import ravel_pytree
 
 from newton_smoothers.base import MVNStandard, FunctionalModel
@@ -24,7 +26,7 @@ def _gauss_newton_step(
     grad = jnp.dot(J.T @ W, r)
     hess_reg = J.T @ W @ J + lmbda * jnp.eye(d)
 
-    dx = -jnp.linalg.solve(hess_reg, grad)
+    dx = -jsc.linalg.solve(hess_reg, grad)
     df = -jnp.dot(dx, grad) - 0.5 * jnp.dot(jnp.dot(dx, hess_reg), dx)
     return dx, df
 

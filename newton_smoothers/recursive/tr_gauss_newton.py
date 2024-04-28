@@ -24,13 +24,6 @@ def trust_region_iterated_recursive_gauss_newton_smoother(
     lmbda: float = 1e2,
     nu: float = 2.0,
 ):
-    init_cost = log_posterior_cost(
-        init_nominal.mean,
-        observations,
-        init_dist,
-        transition_model,
-        observation_model,
-    )
 
     def _gauss_newton_step(nominal_trajectory, lmbda):
         return _recursive_gauss_newton_step(
@@ -89,6 +82,14 @@ def trust_region_iterated_recursive_gauss_newton_smoother(
             operand=(lmbda, nu),
         )
         return (smoothed_trajectory, lmbda, nu), cost
+
+    init_cost = log_posterior_cost(
+        init_nominal.mean,
+        observations,
+        init_dist,
+        transition_model,
+        observation_model,
+    )
 
     (smoothed_trajectory, _, _), costs = jax.lax.scan(
         body, (init_nominal, lmbda, nu), jnp.arange(nb_iter)

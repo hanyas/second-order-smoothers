@@ -16,6 +16,7 @@ def log_posterior_cost(
     transition_model: FunctionalModel,
     observation_model: FunctionalModel,
 ):
+    x0 = states[0]
     xp, xn = states[:-1], states[1:]
     yn = observations
 
@@ -26,7 +27,7 @@ def log_posterior_cost(
     xn_mu = jax.vmap(f)(xp)
     yn_mu = jax.vmap(h)(xn)
 
-    cost = weighted_sqr_dist(states[0], m0, P0)
+    cost = weighted_sqr_dist(x0, m0, P0)
     cost += jnp.sum(jax.vmap(weighted_sqr_dist, in_axes=(0, 0, None))(xn, xn_mu, Q))
     cost += jnp.sum(jax.vmap(weighted_sqr_dist, in_axes=(0, 0, None))(yn, yn_mu, R))
     return cost
@@ -39,6 +40,7 @@ def approx_log_posterior_cost(
     linear_transition: LinearTransition,
     linear_observation: LinearObservation,
 ):
+    x0 = states[0]
     xp, xn = states[:-1], states[1:]
     yn = observations
 
@@ -49,7 +51,7 @@ def approx_log_posterior_cost(
     xn_mu = jnp.einsum("nij,nj->ni", F_x, xp) + b
     yn_mu = jnp.einsum("nij,nj->ni", H_x, xn) + c
 
-    cost = weighted_sqr_dist(states[0], m0, P0)
+    cost = weighted_sqr_dist(x0, m0, P0)
     cost += jnp.sum(jax.vmap(weighted_sqr_dist)(xn, xn_mu, Q))
     cost += jnp.sum(jax.vmap(weighted_sqr_dist)(yn, yn_mu, R))
     return cost
