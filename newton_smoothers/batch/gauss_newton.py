@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Callable
 
 import jax
@@ -30,6 +31,7 @@ def _gauss_newton_step(
     return dx, df
 
 
+partial(jax.jit, static_argnums=(1, 2, -1))
 def _gauss_newton(
     x0: jnp.ndarray,
     fun: Callable,
