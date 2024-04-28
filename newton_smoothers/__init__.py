@@ -1,5 +1,6 @@
 __version__ = "0.0.0"
 
+from .batch import iterated_batch_gauss_newton_smoother
 from .batch import line_search_iterated_batch_gauss_newton_smoother
 from .batch import trust_region_iterated_batch_gauss_newton_smoother
 
