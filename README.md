@@ -1,6 +1,6 @@
-# Second-Order Iterated Smoothers
+# Newton Methods for Smoothing in State-Space Models
 
-A toolbox for batch and recursive smoothing methods.
+A toolbox for second-order batch and recursive smoothing methods.
 
 ## Installation
  
@@ -18,3 +18,11 @@ A toolbox for batch and recursive smoothing methods.
  
     python examples/recursive/recursive_tr_newton.py
     
+## Cite
+```
+@inproceedings{yaghoobi2023recursive,
+  title={A Recursive Newton Method for Smoothing in Nonlinear State Space Models}, 
+  author={Yaghoobi, Fatemeh and Abdulsamad, Hany and Särkkä, Simo},
+  booktitle={2023 31st European Signal Processing Conference (EUSIPCO)}, 
+  year={2023},
+}
