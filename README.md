@@ -19,7 +19,7 @@ A toolbox for second-order batch and recursive smoothing methods.
     python examples/recursive/recursive_tr_newton.py
     
 ## Cite
-```
+```bib
 @inproceedings{yaghoobi2023recursive,
   title={A Recursive Newton Method for Smoothing in Nonlinear State Space Models}, 
   author={Yaghoobi, Fatemeh and Abdulsamad, Hany and Särkkä, Simo},
